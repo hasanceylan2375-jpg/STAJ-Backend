@@ -1,0 +1,6 @@
+@STAJ_HostAddress = http://localhost:5087
+
+GET {{STAJ_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
