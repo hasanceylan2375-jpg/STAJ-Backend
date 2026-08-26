@@ -35,6 +35,7 @@ namespace STAJ.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public IActionResult Ekle(Musteri musteri)
         {
             _service.Ekle(musteri);
@@ -42,6 +43,7 @@ namespace STAJ.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public IActionResult Guncelle(int id, Musteri musteri)
         {
             musteri.Id = id;
@@ -50,6 +52,7 @@ namespace STAJ.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public IActionResult Sil(int id)
         {
             _service.Sil(id);
