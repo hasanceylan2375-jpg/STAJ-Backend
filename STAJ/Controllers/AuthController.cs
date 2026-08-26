@@ -56,5 +56,18 @@ namespace STAJ.Controllers
                 refreshTokenExpiresAt = result.Value.RefreshToken.ExpiresAt
             });
         }
+
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout([FromBody] RefreshTokenRequest request)
+        {
+            var result = await _authService.LogoutAsync(request.RefreshToken);
+
+            if (!result)
+            {
+                return BadRequest("Refresh token geçersiz veya zaten çıkış yapılmış.");
+            }
+
+            return Ok(new { mesaj = "Çıkış başarılı." });
+        }
     }
 }
