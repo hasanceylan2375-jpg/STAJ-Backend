@@ -107,6 +107,20 @@ namespace STAJ.Services
             return (accessToken, newRefreshToken);
         }
 
+        public async Task<bool> LogoutAsync(string refreshTokenValue)
+        {
+            var refreshToken = await _context.RefreshTokens
+                .FirstOrDefaultAsync(x => x.Token == refreshTokenValue);
+
+            if (refreshToken == null || refreshToken.RevokedAt.HasValue)
+                return false;
+
+            refreshToken.RevokedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
         public void KullaniciOlustur(string kullaniciAdi, string sifre, string rol)
         {
             var hashliSifre = BCrypt.Net.BCrypt.HashPassword(sifre);
