@@ -1,18 +1,23 @@
-﻿using STAJ.Data;
+using STAJ.Data;
 using STAJ.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
+
 namespace STAJ.Services
 {
     public class AuthService
     {
         private readonly AppDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public AuthService(AppDbContext context)
+        public AuthService(AppDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
 
         public Kullanici? Login(string kullaniciAdi, string sifre)
@@ -28,16 +33,17 @@ namespace STAJ.Services
 
             return kullanici;
         }
+
         public string TokenOlustur(Kullanici kullanici)
         {
             var claims = new[]
             {
-        new Claim(ClaimTypes.Name, kullanici.KullaniciAdi),
-        new Claim(ClaimTypes.Role, kullanici.Rol)
-    };
+                new Claim(ClaimTypes.Name, kullanici.KullaniciAdi),
+                new Claim(ClaimTypes.Role, kullanici.Rol)
+            };
 
             var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes("STAJ-Projesi-Super-Gizli-JWT-Anahtari-2026")
+                Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!)
             );
 
             var credentials = new SigningCredentials(
@@ -46,15 +52,61 @@ namespace STAJ.Services
             );
 
             var token = new JwtSecurityToken(
-                issuer: "STAJ",
-                audience: "STAJFrontend",
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(15),
+                expires: DateTime.UtcNow.AddMinutes(
+                    _configuration.GetValue<int>("Jwt:AccessTokenExpirationMinutes", 15)
+                ),
                 signingCredentials: credentials
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
+        public async Task<RefreshToken> RefreshTokenOlusturAsync(Kullanici kullanici)
+        {
+            var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            var expirationDays = _configuration.GetValue<int>("Jwt:RefreshTokenExpirationDays", 7);
+
+            var refreshToken = new RefreshToken
+            {
+                UserId = kullanici.Id,
+                Token = token,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddDays(expirationDays)
+            };
+
+            _context.RefreshTokens.Add(refreshToken);
+            await _context.SaveChangesAsync();
+
+            return refreshToken;
+        }
+
+        public async Task<(string AccessToken, RefreshToken RefreshToken)?> RefreshAsync(string refreshTokenValue)
+        {
+            var refreshToken = await _context.RefreshTokens
+                .Include(x => x.User)
+                .FirstOrDefaultAsync(x => x.Token == refreshTokenValue);
+
+            if (refreshToken == null ||
+                refreshToken.RevokedAt.HasValue ||
+                refreshToken.ExpiresAt <= DateTime.UtcNow)
+            {
+                return null;
+            }
+
+            refreshToken.RevokedAt = DateTime.UtcNow;
+
+            var newRefreshToken = await RefreshTokenOlusturAsync(refreshToken.User);
+            refreshToken.ReplacedByToken = newRefreshToken.Token;
+
+            var accessToken = TokenOlustur(refreshToken.User);
+            await _context.SaveChangesAsync();
+
+            return (accessToken, newRefreshToken);
+        }
+
         public void KullaniciOlustur(string kullaniciAdi, string sifre, string rol)
         {
             var hashliSifre = BCrypt.Net.BCrypt.HashPassword(sifre);
