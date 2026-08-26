@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using STAJ.Entities;
 using STAJ.Services;
 namespace STAJ.Controllers
@@ -6,6 +7,7 @@ namespace STAJ.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class MusteriController : ControllerBase
     {
         private readonly MusteriService _service;

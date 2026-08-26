@@ -12,6 +12,7 @@ namespace STAJ.Data
             }
 
             public DbSet<Musteri> Musteriler { get; set; }
-        
+        public DbSet<Kullanici> Kullanicilar { get; set; }
+
     }
 }
