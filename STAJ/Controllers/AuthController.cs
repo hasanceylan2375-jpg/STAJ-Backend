@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using STAJ.Services;
 using STAJ.Entities;
+
 namespace STAJ.Controllers
 {
     [ApiController]
@@ -15,23 +16,45 @@ namespace STAJ.Controllers
         }
 
         [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginRequest request)
-{
-    var kullanici = _authService.Login(request.KullaniciAdi, request.Sifre);
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+            var kullanici = _authService.Login(request.KullaniciAdi, request.Sifre);
 
             if (kullanici == null)
             {
                 return Unauthorized("Kullanıcı adı veya şifre hatalı.");
             }
-            var token = _authService.TokenOlustur(kullanici);
+
+            var accessToken = _authService.TokenOlustur(kullanici);
+            var refreshToken = await _authService.RefreshTokenOlusturAsync(kullanici);
+
             return Ok(new
             {
                 mesaj = "Giriş başarılı.",
                 kullaniciAdi = kullanici.KullaniciAdi,
                 rol = kullanici.Rol,
-                accessToken = token
+                accessToken,
+                refreshToken = refreshToken.Token,
+                refreshTokenExpiresAt = refreshToken.ExpiresAt
             });
         }
 
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest request)
+        {
+            var result = await _authService.RefreshAsync(request.RefreshToken);
+
+            if (result == null)
+            {
+                return Unauthorized("Refresh token geçersiz veya süresi dolmuş.");
+            }
+
+            return Ok(new
+            {
+                accessToken = result.Value.AccessToken,
+                refreshToken = result.Value.RefreshToken.Token,
+                refreshTokenExpiresAt = result.Value.RefreshToken.ExpiresAt
+            });
+        }
     }
 }
