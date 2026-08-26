@@ -50,7 +50,14 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 app.UseCors("AngularPolicy");
 app.UseSwagger();
-app.UseSwaggerUI(); 
+app.UseSwaggerUI();
+
+// HTTPS güvenliğini production ortamında HSTS ile güçlendir.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
