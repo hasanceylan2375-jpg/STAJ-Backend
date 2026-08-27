@@ -1,4 +1,4 @@
-﻿using STAJ.Entities;
+using STAJ.Entities;
 using STAJ.Repositories;
 
 namespace STAJ.Services
@@ -17,9 +17,9 @@ namespace STAJ.Services
             _repository.Ekle(musteri);
         }
 
-        public List<Musteri> Getir(string? search = null, string? sort = null)
+        public List<Musteri> Getir(string? search = null, string? sort = null, int page = 1, int pageSize = 5)
         {
-            return _repository.Getir(search, sort);
+            return _repository.Getir(search, sort, page, pageSize);
         }
 
         public Musteri? IdyeGoreGetir(int id)
