@@ -1,9 +1,10 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using STAJ.Entities;
+using STAJ.Results;
 using STAJ.Services;
-namespace STAJ.Controllers
 
+namespace STAJ.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -20,7 +21,8 @@ namespace STAJ.Controllers
         [HttpGet]
         public IActionResult Getir()
         {
-            return Ok(_service.Getir());
+            var musteriler = _service.Getir();
+            return Ok(new DataResult<object>(true, "Müşteriler başarıyla getirildi.", musteriler));
         }
 
         [HttpGet("{id}")]
@@ -29,9 +31,9 @@ namespace STAJ.Controllers
             var musteri = _service.IdyeGoreGetir(id);
 
             if (musteri == null)
-                return NotFound();
+                return NotFound(new DataResult<object>(false, "Müşteri bulunamadı."));
 
-            return Ok(musteri);
+            return Ok(new DataResult<Musteri>(true, "Müşteri başarıyla getirildi.", musteri));
         }
 
         [HttpPost]
@@ -39,25 +41,35 @@ namespace STAJ.Controllers
         public IActionResult Ekle(Musteri musteri)
         {
             _service.Ekle(musteri);
-            return Ok(musteri);
+            return Ok(new DataResult<Musteri>(true, "Müşteri başarıyla eklendi.", musteri));
         }
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
         public IActionResult Guncelle(int id, Musteri musteri)
         {
+            var mevcutMusteri = _service.IdyeGoreGetir(id);
+
+            if (mevcutMusteri == null)
+                return NotFound(new DataResult<object>(false, "Güncellenecek müşteri bulunamadı."));
+
             musteri.Id = id;
             _service.Guncelle(musteri);
-            return Ok(musteri);
+
+            return Ok(new DataResult<Musteri>(true, "Müşteri başarıyla güncellendi.", musteri));
         }
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public IActionResult Sil(int id)
         {
-            _service.Sil(id);
-            return NoContent();
-        }
+            var mevcutMusteri = _service.IdyeGoreGetir(id);
 
+            if (mevcutMusteri == null)
+                return NotFound(new DataResult<object>(false, "Silinecek müşteri bulunamadı."));
+
+            _service.Sil(id);
+            return Ok(new DataResult<object>(true, "Müşteri başarıyla silindi."));
+        }
     }
 }
