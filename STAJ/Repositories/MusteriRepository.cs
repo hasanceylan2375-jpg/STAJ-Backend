@@ -21,22 +21,18 @@ namespace STAJ.Repositories
         public void Guncelle(Musteri musteri)
         {
             var mevcutMusteri = _context.Musteriler.Find(musteri.Id);
-
-            if (mevcutMusteri == null)
-                return;
+            if (mevcutMusteri == null) return;
 
             mevcutMusteri.Ad = musteri.Ad;
             mevcutMusteri.Soyad = musteri.Soyad;
             mevcutMusteri.Telefon = musteri.Telefon;
             mevcutMusteri.Email = musteri.Email;
-
             _context.SaveChanges();
         }
 
         public void Sil(int id)
         {
             var musteri = _context.Musteriler.Find(id);
-
             if (musteri != null)
             {
                 _context.Musteriler.Remove(musteri);
@@ -44,10 +40,7 @@ namespace STAJ.Repositories
             }
         }
 
-        public Musteri? IdyeGoreGetir(int id)
-        {
-            return _context.Musteriler.Find(id);
-        }
+        public Musteri? IdyeGoreGetir(int id) => _context.Musteriler.Find(id);
 
         public List<Musteri> Getir(string? search = null, string? sort = null, int page = 1, int pageSize = 5)
         {
@@ -56,9 +49,7 @@ namespace STAJ.Repositories
             if (!string.IsNullOrWhiteSpace(search))
             {
                 search = search.Trim().ToLower();
-                sorgu = sorgu.Where(x =>
-                    x.Ad.ToLower().Contains(search) ||
-                    x.Soyad.ToLower().Contains(search));
+                sorgu = sorgu.Where(x => x.Ad.ToLower().Contains(search) || x.Soyad.ToLower().Contains(search));
             }
 
             sorgu = sort?.ToLower() switch
@@ -74,10 +65,21 @@ namespace STAJ.Repositories
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 5;
 
-            return sorgu
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
+            return sorgu.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        }
+
+        public List<Musteri> CursorIleGetir(int? lastId = null, int pageSize = 5)
+        {
+            if (pageSize < 1) pageSize = 5;
+
+            var sorgu = _context.Musteriler.OrderBy(x => x.Id).AsQueryable();
+
+            if (lastId.HasValue)
+            {
+                sorgu = sorgu.Where(x => x.Id > lastId.Value);
+            }
+
+            return sorgu.Take(pageSize).ToList();
         }
     }
 }
