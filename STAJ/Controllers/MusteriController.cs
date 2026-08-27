@@ -53,10 +53,14 @@ namespace STAJ.Controllers
             if (mevcutMusteri == null)
                 return NotFound(new DataResult<object>(false, "Güncellenecek müşteri bulunamadı."));
 
-            musteri.Id = id;
-            _service.Guncelle(musteri);
+            mevcutMusteri.Ad = musteri.Ad;
+            mevcutMusteri.Soyad = musteri.Soyad;
+            mevcutMusteri.Telefon = musteri.Telefon;
+            mevcutMusteri.Email = musteri.Email;
 
-            return Ok(new DataResult<Musteri>(true, "Müşteri başarıyla güncellendi.", musteri));
+            _service.Guncelle(mevcutMusteri);
+
+            return Ok(new DataResult<Musteri>(true, "Müşteri başarıyla güncellendi.", mevcutMusteri));
         }
 
         [HttpDelete("{id}")]
