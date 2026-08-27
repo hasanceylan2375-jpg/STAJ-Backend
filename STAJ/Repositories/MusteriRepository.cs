@@ -49,7 +49,7 @@ namespace STAJ.Repositories
             return _context.Musteriler.Find(id);
         }
 
-        public List<Musteri> Getir(string? search = null)
+        public List<Musteri> Getir(string? search = null, string? sort = null)
         {
             var sorgu = _context.Musteriler.AsQueryable();
 
@@ -61,6 +61,18 @@ namespace STAJ.Repositories
                     x.Ad.ToLower().Contains(search) ||
                     x.Soyad.ToLower().Contains(search));
             }
+
+            sort = sort?.Trim().ToLower();
+
+            sorgu = sort switch
+            {
+                "ad" => sorgu.OrderBy(x => x.Ad),
+                "ad_desc" => sorgu.OrderByDescending(x => x.Ad),
+                "soyad" => sorgu.OrderBy(x => x.Soyad),
+                "soyad_desc" => sorgu.OrderByDescending(x => x.Soyad),
+                "id_desc" => sorgu.OrderByDescending(x => x.Id),
+                _ => sorgu.OrderBy(x => x.Id)
+            };
 
             return sorgu.ToList();
         }
