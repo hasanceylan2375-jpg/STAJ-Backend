@@ -1,4 +1,4 @@
-﻿using STAJ.Data;
+using STAJ.Data;
 using STAJ.Entities;
 
 namespace STAJ.Repositories
@@ -49,22 +49,19 @@ namespace STAJ.Repositories
             return _context.Musteriler.Find(id);
         }
 
-        public List<Musteri> Getir(string? search = null, string? sort = null)
+        public List<Musteri> Getir(string? search = null, string? sort = null, int page = 1, int pageSize = 5)
         {
             var sorgu = _context.Musteriler.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 search = search.Trim().ToLower();
-
                 sorgu = sorgu.Where(x =>
                     x.Ad.ToLower().Contains(search) ||
                     x.Soyad.ToLower().Contains(search));
             }
 
-            sort = sort?.Trim().ToLower();
-
-            sorgu = sort switch
+            sorgu = sort?.ToLower() switch
             {
                 "ad" => sorgu.OrderBy(x => x.Ad),
                 "ad_desc" => sorgu.OrderByDescending(x => x.Ad),
@@ -74,7 +71,13 @@ namespace STAJ.Repositories
                 _ => sorgu.OrderBy(x => x.Id)
             };
 
-            return sorgu.ToList();
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 5;
+
+            return sorgu
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
         }
     }
 }
