@@ -19,21 +19,29 @@ namespace STAJ.Controllers
         }
 
         [HttpGet]
-        public IActionResult Getir(
-            [FromQuery] string? search = null,
-            [FromQuery] string? sort = null,
-            [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 5)
+        public IActionResult Getir([FromQuery] string? search = null, [FromQuery] string? sort = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 5)
         {
             var musteriler = _service.Getir(search, sort, page, pageSize);
             return Ok(new DataResult<object>(true, "Müşteriler başarıyla getirildi.", musteriler));
+        }
+
+        [HttpGet("cursor")]
+        public IActionResult CursorIleGetir([FromQuery] int? lastId = null, [FromQuery] int pageSize = 5)
+        {
+            var musteriler = _service.CursorIleGetir(lastId, pageSize);
+            var nextCursor = musteriler.Count > 0 ? musteriler.Last().Id : (int?)null;
+
+            return Ok(new DataResult<object>(true, "Müşteriler başarıyla getirildi.", new
+            {
+                items = musteriler,
+                nextCursor
+            }));
         }
 
         [HttpGet("{id}")]
         public IActionResult IdyeGoreGetir(int id)
         {
             var musteri = _service.IdyeGoreGetir(id);
-
             if (musteri == null)
                 return NotFound(new DataResult<object>(false, "Müşteri bulunamadı."));
 
@@ -53,7 +61,6 @@ namespace STAJ.Controllers
         public IActionResult Guncelle(int id, Musteri musteri)
         {
             var mevcutMusteri = _service.IdyeGoreGetir(id);
-
             if (mevcutMusteri == null)
                 return NotFound(new DataResult<object>(false, "Güncellenecek müşteri bulunamadı."));
 
@@ -61,7 +68,6 @@ namespace STAJ.Controllers
             mevcutMusteri.Soyad = musteri.Soyad;
             mevcutMusteri.Telefon = musteri.Telefon;
             mevcutMusteri.Email = musteri.Email;
-
             _service.Guncelle(mevcutMusteri);
 
             return Ok(new DataResult<Musteri>(true, "Müşteri başarıyla güncellendi.", mevcutMusteri));
@@ -72,7 +78,6 @@ namespace STAJ.Controllers
         public IActionResult Sil(int id)
         {
             var mevcutMusteri = _service.IdyeGoreGetir(id);
-
             if (mevcutMusteri == null)
                 return NotFound(new DataResult<object>(false, "Silinecek müşteri bulunamadı."));
 
