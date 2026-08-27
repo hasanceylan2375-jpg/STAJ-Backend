@@ -1,7 +1,11 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using STAJ.Data;
+using STAJ.Middleware;
 using STAJ.Repositories;
+using STAJ.Results;
 using STAJ.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -37,17 +41,34 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .SelectMany(x => x.Value!.Errors)
+                .Select(x => string.IsNullOrWhiteSpace(x.ErrorMessage) ? "Geçersiz veri gönderildi." : x.ErrorMessage)
+                .ToList();
+
+            return new BadRequestObjectResult(
+                new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", errors)
+            );
+        };
+    });
+
 builder.Services.AddScoped<MusteriRepository>();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<MusteriService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+app.UseMiddleware<ExceptionMiddleware>();
 app.UseCors("AngularPolicy");
 app.UseSwagger();
 app.UseSwaggerUI();
@@ -58,18 +79,14 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthentication();
-
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
