@@ -17,9 +17,9 @@ namespace STAJ.Services
             _repository.Ekle(musteri);
         }
 
-        public List<Musteri> Getir(string? search = null)
+        public List<Musteri> Getir(string? search = null, string? sort = null)
         {
-            return _repository.Getir(search);
+            return _repository.Getir(search, sort);
         }
 
         public Musteri? IdyeGoreGetir(int id)
