@@ -49,9 +49,20 @@ namespace STAJ.Repositories
             return _context.Musteriler.Find(id);
         }
 
-        public List<Musteri> Getir()
+        public List<Musteri> Getir(string? search = null)
         {
-            return _context.Musteriler.ToList();
+            var sorgu = _context.Musteriler.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                search = search.Trim().ToLower();
+
+                sorgu = sorgu.Where(x =>
+                    x.Ad.ToLower().Contains(search) ||
+                    x.Soyad.ToLower().Contains(search));
+            }
+
+            return sorgu.ToList();
         }
     }
 }
