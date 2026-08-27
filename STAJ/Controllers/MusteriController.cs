@@ -19,9 +19,9 @@ namespace STAJ.Controllers
         }
 
         [HttpGet]
-        public IActionResult Getir([FromQuery] string? search = null)
+        public IActionResult Getir([FromQuery] string? search = null, [FromQuery] string? sort = null)
         {
-            var musteriler = _service.Getir(search);
+            var musteriler = _service.Getir(search, sort);
             return Ok(new DataResult<object>(true, "Müşteriler başarıyla getirildi.", musteriler));
         }
 
