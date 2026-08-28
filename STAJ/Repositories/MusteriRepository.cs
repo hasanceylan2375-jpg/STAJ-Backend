@@ -3,7 +3,7 @@ using STAJ.Entities;
 
 namespace STAJ.Repositories
 {
-    public class MusteriRepository
+    public class MusteriRepository : IMusteriRepository
     {
         private readonly AppDbContext _context;
 
