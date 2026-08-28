@@ -11,7 +11,7 @@ using STAJ.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 var supportedCultures = new[] { "tr-TR", "en-US" };
-builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+builder.Services.AddLocalization(options => options.ResourcesPath = "");
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
     options.SetDefaultCulture("tr-TR");
