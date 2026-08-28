@@ -1,3 +1,5 @@
+using System.Globalization;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using STAJ.Data;
@@ -7,6 +9,14 @@ using STAJ.Results;
 using STAJ.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var supportedCultures = new[] { "tr-TR", "en-US" };
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.SetDefaultCulture("tr-TR");
+    options.AddSupportedCultures(supportedCultures);
+    options.AddSupportedUICultures(supportedCultures);
+});
 
 builder.Services.AddCors(options =>
 {
@@ -62,6 +72,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 var app = builder.Build();
 
+var localizationOptions = new RequestLocalizationOptions()
+    .SetDefaultCulture("tr-TR")
+    .AddSupportedCultures(supportedCultures)
+    .AddSupportedUICultures(supportedCultures);
+
+app.UseRequestLocalization(localizationOptions);
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseCors("AngularPolicy");
 
