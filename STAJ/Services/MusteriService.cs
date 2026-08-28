@@ -5,9 +5,9 @@ namespace STAJ.Services
 {
     public class MusteriService
     {
-        private readonly MusteriRepository _repository;
+        private readonly IMusteriRepository _repository;
 
-        public MusteriService(MusteriRepository repository)
+        public MusteriService(IMusteriRepository repository)
         {
             _repository = repository;
         }
