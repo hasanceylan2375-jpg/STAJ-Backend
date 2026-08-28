@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using STAJ.Entities;
 using STAJ.Results;
+using STAJ.Resources;
 using STAJ.Services;
 
 namespace STAJ.Controllers
@@ -12,17 +14,19 @@ namespace STAJ.Controllers
     public class MusteriController : ControllerBase
     {
         private readonly MusteriService _service;
+        private readonly IStringLocalizer<SharedResource> _localizer;
 
-        public MusteriController(MusteriService service)
+        public MusteriController(MusteriService service, IStringLocalizer<SharedResource> localizer)
         {
             _service = service;
+            _localizer = localizer;
         }
 
         [HttpGet]
         public IActionResult Getir([FromQuery] string? search = null, [FromQuery] string? sort = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 5)
         {
             var musteriler = _service.Getir(search, sort, page, pageSize);
-            return Ok(new DataResult<object>(true, "Müşteriler başarıyla getirildi.", musteriler));
+            return Ok(new DataResult<object>(true, _localizer["CustomersRetrieved"], musteriler));
         }
 
         [HttpGet("cursor")]
@@ -30,22 +34,15 @@ namespace STAJ.Controllers
         {
             var musteriler = _service.CursorIleGetir(lastId, pageSize);
             var nextCursor = musteriler.Count > 0 ? musteriler.Last().Id : (int?)null;
-
-            return Ok(new DataResult<object>(true, "Müşteriler başarıyla getirildi.", new
-            {
-                items = musteriler,
-                nextCursor
-            }));
+            return Ok(new DataResult<object>(true, _localizer["CustomersRetrieved"], new { items = musteriler, nextCursor }));
         }
 
         [HttpGet("{id}")]
         public IActionResult IdyeGoreGetir(int id)
         {
             var musteri = _service.IdyeGoreGetir(id);
-            if (musteri == null)
-                return NotFound(new DataResult<object>(false, "Müşteri bulunamadı."));
-
-            return Ok(new DataResult<Musteri>(true, "Müşteri başarıyla getirildi.", musteri));
+            if (musteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerNotFound"]));
+            return Ok(new DataResult<Musteri>(true, _localizer["CustomerRetrieved"], musteri));
         }
 
         [HttpPost]
@@ -53,7 +50,7 @@ namespace STAJ.Controllers
         public IActionResult Ekle(Musteri musteri)
         {
             _service.Ekle(musteri);
-            return Ok(new DataResult<Musteri>(true, "Müşteri başarıyla eklendi.", musteri));
+            return Ok(new DataResult<Musteri>(true, _localizer["CustomerAdded"], musteri));
         }
 
         [HttpPut("{id}")]
@@ -61,16 +58,13 @@ namespace STAJ.Controllers
         public IActionResult Guncelle(int id, Musteri musteri)
         {
             var mevcutMusteri = _service.IdyeGoreGetir(id);
-            if (mevcutMusteri == null)
-                return NotFound(new DataResult<object>(false, "Güncellenecek müşteri bulunamadı."));
-
+            if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToUpdateNotFound"]));
             mevcutMusteri.Ad = musteri.Ad;
             mevcutMusteri.Soyad = musteri.Soyad;
             mevcutMusteri.Telefon = musteri.Telefon;
             mevcutMusteri.Email = musteri.Email;
             _service.Guncelle(mevcutMusteri);
-
-            return Ok(new DataResult<Musteri>(true, "Müşteri başarıyla güncellendi.", mevcutMusteri));
+            return Ok(new DataResult<Musteri>(true, _localizer["CustomerUpdated"], mevcutMusteri));
         }
 
         [HttpDelete("{id}")]
@@ -78,11 +72,9 @@ namespace STAJ.Controllers
         public IActionResult Sil(int id)
         {
             var mevcutMusteri = _service.IdyeGoreGetir(id);
-            if (mevcutMusteri == null)
-                return NotFound(new DataResult<object>(false, "Silinecek müşteri bulunamadı."));
-
+            if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToDeleteNotFound"]));
             _service.Sil(id);
-            return Ok(new DataResult<object>(true, "Müşteri başarıyla silindi."));
+            return Ok(new DataResult<object>(true, _localizer["CustomerDeleted"]));
         }
     }
 }
