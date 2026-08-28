@@ -51,6 +51,12 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(builder
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await DataSeeder.SeedAsync(context);
+}
+
 var localizationOptions = new RequestLocalizationOptions().SetDefaultCulture("tr-TR").AddSupportedCultures(supportedCultures).AddSupportedUICultures(supportedCultures);
 localizationOptions.RequestCultureProviders.Insert(0, new AcceptLanguageHeaderRequestCultureProvider());
 app.UseRequestLocalization(localizationOptions);
