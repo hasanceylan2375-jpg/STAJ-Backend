@@ -1,3 +1,4 @@
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -29,6 +30,46 @@ namespace STAJ.Controllers
         {
             var musteriler = _service.Getir(search, sort, page, pageSize);
             return Ok(new DataResult<object>(true, _localizer["CustomersRetrieved"], musteriler));
+        }
+
+        [HttpGet("excel")]
+        [EnableRateLimiting("read")]
+        public IActionResult ExcelAktar([FromQuery] string? search = null, [FromQuery] string? sort = null)
+        {
+            var musteriler = _service.Getir(search, sort, 1, 10000);
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Müşteriler");
+
+            worksheet.Cell(1, 1).Value = "ID";
+            worksheet.Cell(1, 2).Value = "Ad";
+            worksheet.Cell(1, 3).Value = "Soyad";
+            worksheet.Cell(1, 4).Value = "Telefon";
+            worksheet.Cell(1, 5).Value = "E-posta";
+
+            for (int i = 0; i < musteriler.Count; i++)
+            {
+                var musteri = musteriler[i];
+                var row = i + 2;
+                worksheet.Cell(row, 1).Value = musteri.Id;
+                worksheet.Cell(row, 2).Value = musteri.Ad;
+                worksheet.Cell(row, 3).Value = musteri.Soyad;
+                worksheet.Cell(row, 4).Value = musteri.Telefon;
+                worksheet.Cell(row, 5).Value = musteri.Email;
+            }
+
+            var headerRange = worksheet.Range(1, 1, 1, 5);
+            headerRange.Style.Font.Bold = true;
+            worksheet.Columns().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            var fileBytes = stream.ToArray();
+
+            return File(
+                fileBytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "musteriler.xlsx");
         }
 
         [HttpGet("cursor")]
