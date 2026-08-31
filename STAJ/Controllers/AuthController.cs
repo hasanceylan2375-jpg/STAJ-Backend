@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using STAJ.Services;
 using STAJ.Entities;
 
@@ -16,6 +17,7 @@ namespace STAJ.Controllers
         }
 
         [HttpPost("login")]
+        [EnableRateLimiting("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             var kullanici = _authService.Login(request.KullaniciAdi, request.Sifre);
