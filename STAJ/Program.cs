@@ -47,7 +47,7 @@ builder.Services.AddEndpointsApiExplorer(); builder.Services.AddSwaggerGen(); bu
 var app = builder.Build();
 using (var scope = app.Services.CreateScope()) { var context = scope.ServiceProvider.GetRequiredService<AppDbContext>(); await DataSeeder.SeedAsync(context); }
 var localizationOptions = new RequestLocalizationOptions().SetDefaultCulture("tr-TR").AddSupportedCultures(supportedCultures).AddSupportedUICultures(supportedCultures); localizationOptions.RequestCultureProviders.Insert(0, new AcceptLanguageHeaderRequestCultureProvider());
-app.UseRequestLocalization(localizationOptions); app.UseSerilogRequestLogging(); app.UseMiddleware<ExceptionMiddleware>(); app.UseCors("AngularPolicy"); app.UseSwagger(); app.UseSwaggerUI(); if (!app.Environment.IsDevelopment()) app.UseHsts(); app.UseHttpsRedirection(); app.UseRateLimiter(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers(); app.Run();
+app.UseRequestLocalization(localizationOptions); app.UseSerilogRequestLogging(); app.UseMiddleware<ExceptionMiddleware>(); app.UseCors("AngularPolicy"); app.UseSwagger(); app.UseSwaggerUI(); if (!app.Environment.IsDevelopment()) app.UseHsts(); app.UseHttpsRedirection(); app.Use(async (context, next) => { await next(); if (context.Response.StatusCode != StatusCodes.Status429TooManyRequests) { context.Response.Headers["X-RateLimit-Limit"] = "Rate limiting aktif"; context.Response.Headers["X-RateLimit-Window"] = $"{windowSeconds} saniye"; } }); app.UseRateLimiter(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers(); app.Run();
 }
 catch (Exception ex) { Log.Fatal(ex, "Application terminated unexpectedly."); }
 finally { Log.CloseAndFlush(); }
