@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -17,21 +18,13 @@ namespace STAJ.Controllers
     {
         private readonly MusteriService _service;
         private readonly IStringLocalizer<SharedResource> _localizer;
+        private readonly IValidator<Musteri> _validator;
 
-        public MusteriController(MusteriService service, IStringLocalizer<SharedResource> localizer)
+        public MusteriController(MusteriService service, IStringLocalizer<SharedResource> localizer, IValidator<Musteri> validator)
         {
             _service = service;
             _localizer = localizer;
-        }
-
-        private static bool OnSekizYasindanBuyukMu(DateTime? dogumTarihi)
-        {
-            if (!dogumTarihi.HasValue)
-                return true;
-
-            var bugun = DateTime.Today;
-            var onSekizYasTarihi = dogumTarihi.Value.Date.AddYears(18);
-            return onSekizYasTarihi <= bugun;
+            _validator = validator;
         }
 
         [HttpPost("fotoğraf")]
@@ -124,8 +117,9 @@ namespace STAJ.Controllers
         [EnableRateLimiting("write")]
         public IActionResult Ekle(Musteri musteri)
         {
-            if (!OnSekizYasindanBuyukMu(musteri.DogumTarihi))
-                return BadRequest(new DataResult<object>(false, "Müşteri en az 18 yaşında olmalıdır."));
+            var validationResult = _validator.Validate(musteri);
+            if (!validationResult.IsValid)
+                return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
 
             _service.Ekle(musteri);
             return Ok(new DataResult<Musteri>(true, _localizer["CustomerAdded"], musteri));
@@ -136,8 +130,9 @@ namespace STAJ.Controllers
         [EnableRateLimiting("write")]
         public IActionResult Guncelle(int id, Musteri musteri)
         {
-            if (!OnSekizYasindanBuyukMu(musteri.DogumTarihi))
-                return BadRequest(new DataResult<object>(false, "Müşteri en az 18 yaşında olmalıdır."));
+            var validationResult = _validator.Validate(musteri);
+            if (!validationResult.IsValid)
+                return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
 
             var mevcutMusteri = _service.IdyeGoreGetir(id);
             if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToUpdateNotFound"]));
