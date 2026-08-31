@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Localization;
 using STAJ.Entities;
 using STAJ.Results;
@@ -23,6 +24,7 @@ namespace STAJ.Controllers
         }
 
         [HttpGet]
+        [EnableRateLimiting("read")]
         public IActionResult Getir([FromQuery] string? search = null, [FromQuery] string? sort = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 5)
         {
             var musteriler = _service.Getir(search, sort, page, pageSize);
@@ -30,6 +32,7 @@ namespace STAJ.Controllers
         }
 
         [HttpGet("cursor")]
+        [EnableRateLimiting("read")]
         public IActionResult CursorIleGetir([FromQuery] int? lastId = null, [FromQuery] int pageSize = 5)
         {
             var musteriler = _service.CursorIleGetir(lastId, pageSize);
@@ -38,6 +41,7 @@ namespace STAJ.Controllers
         }
 
         [HttpGet("{id}")]
+        [EnableRateLimiting("read")]
         public IActionResult IdyeGoreGetir(int id)
         {
             var musteri = _service.IdyeGoreGetir(id);
@@ -47,6 +51,7 @@ namespace STAJ.Controllers
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("write")]
         public IActionResult Ekle(Musteri musteri)
         {
             _service.Ekle(musteri);
@@ -55,6 +60,7 @@ namespace STAJ.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("write")]
         public IActionResult Guncelle(int id, Musteri musteri)
         {
             var mevcutMusteri = _service.IdyeGoreGetir(id);
@@ -69,6 +75,7 @@ namespace STAJ.Controllers
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("write")]
         public IActionResult Sil(int id)
         {
             var mevcutMusteri = _service.IdyeGoreGetir(id);
