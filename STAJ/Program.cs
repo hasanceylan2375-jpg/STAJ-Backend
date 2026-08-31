@@ -23,43 +23,22 @@ builder.Services.AddCors(options => options.AddPolicy("AngularPolicy", policy =>
 var permitLimit = builder.Configuration.GetValue<int>("RateLimiting:PermitLimit", 20);
 var userPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:UserPermitLimit", 30);
 var loginPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:LoginPermitLimit", 5);
+var readPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:ReadPermitLimit", 40);
+var writePermitLimit = builder.Configuration.GetValue<int>("RateLimiting:WritePermitLimit", 15);
 var windowSeconds = builder.Configuration.GetValue<int>("RateLimiting:WindowSeconds", 60);
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
     {
-        var userId = context.User.Identity?.IsAuthenticated == true
-            ? context.User.Identity.Name ?? context.User.FindFirst("sub")?.Value ?? "authenticated-user"
-            : context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-
+        var userId = context.User.Identity?.IsAuthenticated == true ? context.User.Identity.Name ?? context.User.FindFirst("sub")?.Value ?? "authenticated-user" : context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var limit = context.User.Identity?.IsAuthenticated == true ? userPermitLimit : permitLimit;
-
-        return RateLimitPartition.GetFixedWindowLimiter(userId, _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = limit,
-            Window = TimeSpan.FromSeconds(windowSeconds),
-            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-            QueueLimit = 0
-        });
+        return RateLimitPartition.GetFixedWindowLimiter(userId, _ => new FixedWindowRateLimiterOptions { PermitLimit = limit, Window = TimeSpan.FromSeconds(windowSeconds), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0 });
     });
-
-    options.AddFixedWindowLimiter("login", limiterOptions =>
-    {
-        limiterOptions.PermitLimit = loginPermitLimit;
-        limiterOptions.Window = TimeSpan.FromSeconds(windowSeconds);
-        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        limiterOptions.QueueLimit = 0;
-    });
-
-    options.OnRejected = async (context, cancellationToken) =>
-    {
-        var response = context.HttpContext.Response;
-        response.Headers["Retry-After"] = windowSeconds.ToString();
-        response.ContentType = "application/json";
-        await response.WriteAsJsonAsync(new { success = false, message = "Çok fazla istek gönderdiniz. Lütfen daha sonra tekrar deneyin.", statusCode = StatusCodes.Status429TooManyRequests }, cancellationToken);
-    };
+    options.AddFixedWindowLimiter("login", limiterOptions => { limiterOptions.PermitLimit = loginPermitLimit; limiterOptions.Window = TimeSpan.FromSeconds(windowSeconds); limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst; limiterOptions.QueueLimit = 0; });
+    options.AddFixedWindowLimiter("read", limiterOptions => { limiterOptions.PermitLimit = readPermitLimit; limiterOptions.Window = TimeSpan.FromSeconds(windowSeconds); limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst; limiterOptions.QueueLimit = 0; });
+    options.AddFixedWindowLimiter("write", limiterOptions => { limiterOptions.PermitLimit = writePermitLimit; limiterOptions.Window = TimeSpan.FromSeconds(windowSeconds); limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst; limiterOptions.QueueLimit = 0; });
+    options.OnRejected = async (context, cancellationToken) => { var response = context.HttpContext.Response; response.Headers["Retry-After"] = windowSeconds.ToString(); response.ContentType = "application/json"; await response.WriteAsJsonAsync(new { success = false, message = "Çok fazla istek gönderdiniz. Lütfen daha sonra tekrar deneyin.", statusCode = StatusCodes.Status429TooManyRequests }, cancellationToken); };
 });
 
 builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options => { options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters { ValidateIssuer = true, ValidateAudience = true, ValidateLifetime = true, ValidateIssuerSigningKey = true, ValidIssuer = builder.Configuration["Jwt:Issuer"], ValidAudience = builder.Configuration["Jwt:Audience"], IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)) }; });
