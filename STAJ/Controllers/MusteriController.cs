@@ -24,6 +24,16 @@ namespace STAJ.Controllers
             _localizer = localizer;
         }
 
+        private static bool OnSekizYasindanBuyukMu(DateTime? dogumTarihi)
+        {
+            if (!dogumTarihi.HasValue)
+                return true;
+
+            var bugun = DateTime.Today;
+            var onSekizYasTarihi = dogumTarihi.Value.Date.AddYears(18);
+            return onSekizYasTarihi <= bugun;
+        }
+
         [HttpPost("fotoğraf")]
         [Authorize(Roles = "Admin")]
         [EnableRateLimiting("write")]
@@ -114,6 +124,9 @@ namespace STAJ.Controllers
         [EnableRateLimiting("write")]
         public IActionResult Ekle(Musteri musteri)
         {
+            if (!OnSekizYasindanBuyukMu(musteri.DogumTarihi))
+                return BadRequest(new DataResult<object>(false, "Müşteri en az 18 yaşında olmalıdır."));
+
             _service.Ekle(musteri);
             return Ok(new DataResult<Musteri>(true, _localizer["CustomerAdded"], musteri));
         }
@@ -123,12 +136,16 @@ namespace STAJ.Controllers
         [EnableRateLimiting("write")]
         public IActionResult Guncelle(int id, Musteri musteri)
         {
+            if (!OnSekizYasindanBuyukMu(musteri.DogumTarihi))
+                return BadRequest(new DataResult<object>(false, "Müşteri en az 18 yaşında olmalıdır."));
+
             var mevcutMusteri = _service.IdyeGoreGetir(id);
             if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToUpdateNotFound"]));
             mevcutMusteri.Ad = musteri.Ad;
             mevcutMusteri.Soyad = musteri.Soyad;
             mevcutMusteri.Telefon = musteri.Telefon;
             mevcutMusteri.Email = musteri.Email;
+            mevcutMusteri.DogumTarihi = musteri.DogumTarihi;
             mevcutMusteri.ProfilFotoUrl = musteri.ProfilFotoUrl;
             _service.Guncelle(mevcutMusteri);
             return Ok(new DataResult<Musteri>(true, _localizer["CustomerUpdated"], mevcutMusteri));
