@@ -20,8 +20,10 @@ namespace STAJ.Entities
         [EmailAddress(ErrorMessage = "Geçerli bir email adresi giriniz.")]
         public string Email { get; set; } = string.Empty;
 
-        public DateTime? DogumTarihi { get; set; }
+        [Required(ErrorMessage = "T.C. Kimlik No alanı zorunludur.")]
+        public string TcKimlikNo { get; set; } = string.Empty;
 
+        public DateTime? DogumTarihi { get; set; }
         public string? ProfilFotoUrl { get; set; }
     }
 }
