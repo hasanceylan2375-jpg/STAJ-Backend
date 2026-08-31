@@ -19,5 +19,7 @@ namespace STAJ.Entities
         [Required(ErrorMessage = "Email alanı zorunludur.")]
         [EmailAddress(ErrorMessage = "Geçerli bir email adresi giriniz.")]
         public string Email { get; set; } = string.Empty;
+
+        public string? ProfilFotoUrl { get; set; }
     }
 }
