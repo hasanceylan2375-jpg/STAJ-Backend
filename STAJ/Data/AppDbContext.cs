@@ -5,10 +5,7 @@ namespace STAJ.Data
 {
     public class AppDbContext : DbContext
     {
-        public AppDbContext(DbContextOptions<AppDbContext> options)
-            : base(options)
-        {
-        }
+        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
         public DbSet<Musteri> Musteriler { get; set; }
         public DbSet<Kullanici> Kullanicilar { get; set; }
@@ -17,6 +14,10 @@ namespace STAJ.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Musteri>()
+                .HasIndex(x => x.TcKimlikNo)
+                .IsUnique();
 
             modelBuilder.Entity<RefreshToken>()
                 .HasIndex(x => x.Token)
