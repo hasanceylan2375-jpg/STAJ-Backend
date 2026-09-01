@@ -14,6 +14,9 @@ namespace STAJ.Services
 
         public void Ekle(Musteri musteri) => _repository.Ekle(musteri);
 
+        public bool TcKimlikNoVarMi(string tcKimlikNo, int? haricId = null)
+            => _repository.TcKimlikNoVarMi(tcKimlikNo, haricId);
+
         public List<Musteri> Getir(string? search = null, string? sort = null, int page = 1, int pageSize = 5)
         {
             return _repository.Getir(search, sort, page, pageSize);
