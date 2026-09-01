@@ -8,6 +8,7 @@ namespace STAJ.Repositories
         void Guncelle(Musteri musteri);
         void Sil(int id);
         Musteri? IdyeGoreGetir(int id);
+        bool TcKimlikNoVarMi(string tcKimlikNo, int? haricId = null);
         List<Musteri> Getir(string? search = null, string? sort = null, int page = 1, int pageSize = 5);
         List<Musteri> CursorIleGetir(int? lastId = null, int pageSize = 5);
     }
