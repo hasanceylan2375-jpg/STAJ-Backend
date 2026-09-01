@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Localization;
 using STAJ.Entities;
 using STAJ.Results;
@@ -69,6 +70,23 @@ namespace STAJ.Controllers
             await file.CopyToAsync(stream);
 
             return Ok(new { url = $"/uploads/{dosyaAdi}" });
+        }
+
+        [HttpGet("fotoğraf/indir/{dosyaAdi}")]
+        [EnableRateLimiting("read")]
+        public IActionResult FotografIndir(string dosyaAdi)
+        {
+            var guvenliDosyaAdi = Path.GetFileName(dosyaAdi);
+            var dosyaYolu = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", guvenliDosyaAdi);
+
+            if (!System.IO.File.Exists(dosyaYolu))
+                return NotFound("Fotoğraf bulunamadı.");
+
+            var provider = new FileExtensionContentTypeProvider();
+            if (!provider.TryGetContentType(dosyaYolu, out var contentType))
+                contentType = "application/octet-stream";
+
+            return PhysicalFile(dosyaYolu, contentType, guvenliDosyaAdi);
         }
 
         [HttpGet]
