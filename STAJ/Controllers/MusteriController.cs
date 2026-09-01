@@ -121,6 +121,9 @@ namespace STAJ.Controllers
             if (!validationResult.IsValid)
                 return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
 
+            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!))
+                return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No ile kayıtlı bir müşteri zaten var."));
+
             _service.Ekle(musteri);
             return Ok(new DataResult<Musteri>(true, _localizer["CustomerAdded"], musteri));
         }
@@ -133,6 +136,9 @@ namespace STAJ.Controllers
             var validationResult = _validator.Validate(musteri);
             if (!validationResult.IsValid)
                 return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
+
+            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!, id))
+                return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No başka bir müşteriye ait."));
 
             var mevcutMusteri = _service.IdyeGoreGetir(id);
             if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToUpdateNotFound"]));
