@@ -35,6 +35,11 @@ namespace STAJ.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest("Fotoğraf seçilmedi.");
 
+            const long maxDosyaBoyutu = 5 * 1024 * 1024;
+
+            if (file.Length > maxDosyaBoyutu)
+                return BadRequest("Dosya boyutu en fazla 5 MB olabilir.");
+
             var uzantilar = new[] { ".jpg", ".jpeg", ".png", ".webp" };
             var uzanti = Path.GetExtension(file.FileName).ToLowerInvariant();
 
