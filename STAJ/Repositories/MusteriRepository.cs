@@ -42,6 +42,13 @@ namespace STAJ.Repositories
 
         public Musteri? IdyeGoreGetir(int id) => _context.Musteriler.Find(id);
 
+        public bool TcKimlikNoVarMi(string tcKimlikNo, int? haricId = null)
+        {
+            return _context.Musteriler.Any(x =>
+                x.TcKimlikNo == tcKimlikNo &&
+                (!haricId.HasValue || x.Id != haricId.Value));
+        }
+
         public List<Musteri> Getir(string? search = null, string? sort = null, int page = 1, int pageSize = 5)
         {
             var sorgu = _context.Musteriler.AsQueryable();
