@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: staj-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: stajdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Hasan.2424
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stajdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
