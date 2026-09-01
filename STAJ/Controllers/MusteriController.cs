@@ -8,6 +8,7 @@ using STAJ.Entities;
 using STAJ.Results;
 using STAJ.Resources;
 using STAJ.Services;
+using System.Security.Cryptography;
 
 namespace STAJ.Controllers
 {
@@ -48,6 +49,18 @@ namespace STAJ.Controllers
 
             var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
             Directory.CreateDirectory(uploadsPath);
+
+            await using var yuklenenDosyaStream = file.OpenReadStream();
+            var yuklenenHash = Convert.ToHexString(await SHA256.HashDataAsync(yuklenenDosyaStream));
+
+            foreach (var mevcutDosya in Directory.GetFiles(uploadsPath))
+            {
+                await using var mevcutDosyaStream = System.IO.File.OpenRead(mevcutDosya);
+                var mevcutHash = Convert.ToHexString(await SHA256.HashDataAsync(mevcutDosyaStream));
+
+                if (yuklenenHash == mevcutHash)
+                    return BadRequest("Bu fotoğraf daha önce yüklenmiş.");
+            }
 
             var dosyaAdi = $"{Guid.NewGuid()}{uzanti}";
             var dosyaYolu = Path.Combine(uploadsPath, dosyaAdi);
