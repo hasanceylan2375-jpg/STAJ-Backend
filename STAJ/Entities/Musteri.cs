@@ -24,5 +24,6 @@ namespace STAJ.Entities
 
         public DateTime? DogumTarihi { get; set; }
         public string? ProfilFotoUrl { get; set; }
+        public string? FotografHash { get; set; }
     }
 }
