@@ -140,6 +140,7 @@ namespace STAJ.Controllers
             mevcutMusteri.Soyad = musteri.Soyad;
             mevcutMusteri.Telefon = musteri.Telefon;
             mevcutMusteri.Email = musteri.Email;
+            mevcutMusteri.TcKimlikNo = musteri.TcKimlikNo;
             mevcutMusteri.DogumTarihi = musteri.DogumTarihi;
             mevcutMusteri.ProfilFotoUrl = musteri.ProfilFotoUrl;
             _service.Guncelle(mevcutMusteri);
