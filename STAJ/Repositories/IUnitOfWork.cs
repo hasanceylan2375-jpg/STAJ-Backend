@@ -4,5 +4,8 @@ namespace STAJ.Repositories
     {
         IMusteriRepository Musteriler { get; }
         int SaveChanges();
+        void BeginTransaction();
+        void Commit();
+        void Rollback();
     }
 }
