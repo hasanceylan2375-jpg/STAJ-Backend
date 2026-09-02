@@ -22,6 +22,11 @@ builder.Services.AddLocalization(options => options.ResourcesPath = "");
 builder.Services.Configure<RequestLocalizationOptions>(options => { options.SetDefaultCulture("tr-TR"); options.AddSupportedCultures(supportedCultures); options.AddSupportedUICultures(supportedCultures); options.RequestCultureProviders.Insert(0, new AcceptLanguageHeaderRequestCultureProvider()); });
 builder.Services.AddCors(options => options.AddPolicy("AngularPolicy", policy => policy.WithOrigins("http://localhost:4200").AllowAnyHeader().AllowAnyMethod()));
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+});
+
 var permitLimit = builder.Configuration.GetValue<int>("RateLimiting:PermitLimit", 20);
 var userPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:UserPermitLimit", 30);
 var loginPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:LoginPermitLimit", 5);
