@@ -34,41 +34,26 @@ namespace STAJ.Controllers
         [EnableRateLimiting("write")]
         public async Task<IActionResult> FotografYukle(IFormFile file)
         {
-            if (file == null || file.Length == 0)
-                return BadRequest("Fotoğraf seçilmedi.");
-
+            if (file == null || file.Length == 0) return BadRequest("Fotoğraf seçilmedi.");
             const long maxDosyaBoyutu = 5 * 1024 * 1024;
-
-            if (file.Length > maxDosyaBoyutu)
-                return BadRequest("Dosya boyutu en fazla 5 MB olabilir.");
-
+            if (file.Length > maxDosyaBoyutu) return BadRequest("Dosya boyutu en fazla 5 MB olabilir.");
             var uzantilar = new[] { ".jpg", ".jpeg", ".png", ".webp" };
             var uzanti = Path.GetExtension(file.FileName).ToLowerInvariant();
-
-            if (!uzantilar.Contains(uzanti))
-                return BadRequest("Sadece JPG, JPEG, PNG veya WEBP dosyaları yüklenebilir.");
-
+            if (!uzantilar.Contains(uzanti)) return BadRequest("Sadece JPG, JPEG, PNG veya WEBP dosyaları yüklenebilir.");
             var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
             Directory.CreateDirectory(uploadsPath);
-
             await using var yuklenenDosyaStream = file.OpenReadStream();
             var yuklenenHash = Convert.ToHexString(await SHA256.HashDataAsync(yuklenenDosyaStream));
-
             foreach (var mevcutDosya in Directory.GetFiles(uploadsPath))
             {
                 await using var mevcutDosyaStream = System.IO.File.OpenRead(mevcutDosya);
                 var mevcutHash = Convert.ToHexString(await SHA256.HashDataAsync(mevcutDosyaStream));
-
-                if (yuklenenHash == mevcutHash)
-                    return BadRequest("Bu fotoğraf daha önce yüklenmiş.");
+                if (yuklenenHash == mevcutHash) return BadRequest("Bu fotoğraf daha önce yüklenmiş.");
             }
-
             var dosyaAdi = $"{Guid.NewGuid()}{uzanti}";
             var dosyaYolu = Path.Combine(uploadsPath, dosyaAdi);
-
             await using var stream = new FileStream(dosyaYolu, FileMode.Create);
             await file.CopyToAsync(stream);
-
             return Ok(new { url = $"/uploads/{dosyaAdi}" });
         }
 
@@ -78,14 +63,9 @@ namespace STAJ.Controllers
         {
             var guvenliDosyaAdi = Path.GetFileName(dosyaAdi);
             var dosyaYolu = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", guvenliDosyaAdi);
-
-            if (!System.IO.File.Exists(dosyaYolu))
-                return NotFound("Fotoğraf bulunamadı.");
-
+            if (!System.IO.File.Exists(dosyaYolu)) return NotFound("Fotoğraf bulunamadı.");
             var provider = new FileExtensionContentTypeProvider();
-            if (!provider.TryGetContentType(dosyaYolu, out var contentType))
-                contentType = "application/octet-stream";
-
+            if (!provider.TryGetContentType(dosyaYolu, out var contentType)) contentType = "application/octet-stream";
             return PhysicalFile(dosyaYolu, contentType, guvenliDosyaAdi);
         }
 
@@ -98,11 +78,11 @@ namespace STAJ.Controllers
         }
 
         [HttpGet("excel")]
+        [Authorize(Policy = "AdminOnly")]
         [EnableRateLimiting("read")]
         public IActionResult ExcelAktar([FromQuery] string? search = null, [FromQuery] string? sort = null)
         {
             var musteriler = _service.Getir(search, sort, 1, 10000);
-
             using var workbook = new XLWorkbook();
             var worksheet = workbook.Worksheets.Add("Müşteriler");
             worksheet.Cell(1, 1).Value = "ID";
@@ -110,23 +90,18 @@ namespace STAJ.Controllers
             worksheet.Cell(1, 3).Value = "Soyad";
             worksheet.Cell(1, 4).Value = "Telefon";
             worksheet.Cell(1, 5).Value = "E-posta";
-
             for (int i = 0; i < musteriler.Count; i++)
             {
-                var musteri = musteriler[i];
-                var row = i + 2;
+                var musteri = musteriler[i]; var row = i + 2;
                 worksheet.Cell(row, 1).Value = musteri.Id;
                 worksheet.Cell(row, 2).Value = musteri.Ad;
                 worksheet.Cell(row, 3).Value = musteri.Soyad;
                 worksheet.Cell(row, 4).Value = musteri.Telefon;
                 worksheet.Cell(row, 5).Value = musteri.Email;
             }
-
             worksheet.Range(1, 1, 1, 5).Style.Font.Bold = true;
             worksheet.Columns().AdjustToContents();
-
-            using var stream = new MemoryStream();
-            workbook.SaveAs(stream);
+            using var stream = new MemoryStream(); workbook.SaveAs(stream);
             return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "musteriler.xlsx");
         }
 
@@ -154,12 +129,8 @@ namespace STAJ.Controllers
         public IActionResult Ekle(Musteri musteri)
         {
             var validationResult = _validator.Validate(musteri);
-            if (!validationResult.IsValid)
-                return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
-
-            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!))
-                return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No ile kayıtlı bir müşteri zaten var."));
-
+            if (!validationResult.IsValid) return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
+            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!)) return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No ile kayıtlı bir müşteri zaten var."));
             _service.Ekle(musteri);
             return Ok(new DataResult<Musteri>(true, _localizer["CustomerAdded"], musteri));
         }
@@ -170,21 +141,11 @@ namespace STAJ.Controllers
         public IActionResult Guncelle(int id, Musteri musteri)
         {
             var validationResult = _validator.Validate(musteri);
-            if (!validationResult.IsValid)
-                return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
-
-            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!, id))
-                return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No başka bir müşteriye ait."));
-
+            if (!validationResult.IsValid) return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
+            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!, id)) return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No başka bir müşteriye ait."));
             var mevcutMusteri = _service.IdyeGoreGetir(id);
             if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToUpdateNotFound"]));
-            mevcutMusteri.Ad = musteri.Ad;
-            mevcutMusteri.Soyad = musteri.Soyad;
-            mevcutMusteri.Telefon = musteri.Telefon;
-            mevcutMusteri.Email = musteri.Email;
-            mevcutMusteri.TcKimlikNo = musteri.TcKimlikNo;
-            mevcutMusteri.DogumTarihi = musteri.DogumTarihi;
-            mevcutMusteri.ProfilFotoUrl = musteri.ProfilFotoUrl;
+            mevcutMusteri.Ad = musteri.Ad; mevcutMusteri.Soyad = musteri.Soyad; mevcutMusteri.Telefon = musteri.Telefon; mevcutMusteri.Email = musteri.Email; mevcutMusteri.TcKimlikNo = musteri.TcKimlikNo; mevcutMusteri.DogumTarihi = musteri.DogumTarihi; mevcutMusteri.ProfilFotoUrl = musteri.ProfilFotoUrl;
             _service.Guncelle(mevcutMusteri);
             return Ok(new DataResult<Musteri>(true, _localizer["CustomerUpdated"], mevcutMusteri));
         }
