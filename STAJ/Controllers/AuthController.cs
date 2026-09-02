@@ -13,10 +13,9 @@ namespace STAJ.Controllers
         public AuthController(AuthService authService) { _authService = authService; }
 
         [HttpPost("register")]
-        [EnableRateLimiting("login")]
-        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+        public IActionResult Register([FromBody] RegisterRequest request)
         {
-            var hata = await _authService.KayitOlAsync(request.KullaniciAdi, request.Sifre);
+            var hata = _authService.KayitOl(request.KullaniciAdi, request.Sifre);
             if (hata != null) return BadRequest(new { mesaj = hata });
             return Ok(new { mesaj = "Kayıt başarılı. Giriş yapabilirsiniz." });
         }
