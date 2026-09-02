@@ -14,8 +14,17 @@ namespace STAJ.Services
 
         public void Ekle(Musteri musteri)
         {
-            _unitOfWork.Musteriler.Ekle(musteri);
-            _unitOfWork.SaveChanges();
+            try
+            {
+                _unitOfWork.BeginTransaction();
+                _unitOfWork.Musteriler.Ekle(musteri);
+                _unitOfWork.Commit();
+            }
+            catch
+            {
+                _unitOfWork.Rollback();
+                throw;
+            }
         }
 
         public bool TcKimlikNoVarMi(string tcKimlikNo, int? haricId = null)
@@ -35,14 +44,32 @@ namespace STAJ.Services
 
         public void Guncelle(Musteri musteri)
         {
-            _unitOfWork.Musteriler.Guncelle(musteri);
-            _unitOfWork.SaveChanges();
+            try
+            {
+                _unitOfWork.BeginTransaction();
+                _unitOfWork.Musteriler.Guncelle(musteri);
+                _unitOfWork.Commit();
+            }
+            catch
+            {
+                _unitOfWork.Rollback();
+                throw;
+            }
         }
 
         public void Sil(int id)
         {
-            _unitOfWork.Musteriler.Sil(id);
-            _unitOfWork.SaveChanges();
+            try
+            {
+                _unitOfWork.BeginTransaction();
+                _unitOfWork.Musteriler.Sil(id);
+                _unitOfWork.Commit();
+            }
+            catch
+            {
+                _unitOfWork.Rollback();
+                throw;
+            }
         }
     }
 }
