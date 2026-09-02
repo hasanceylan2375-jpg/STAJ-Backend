@@ -38,8 +38,8 @@ builder.Services.AddRateLimiter(options =>
         return RateLimitPartition.GetFixedWindowLimiter(userId, _ => new FixedWindowRateLimiterOptions { PermitLimit = limit, Window = TimeSpan.FromSeconds(windowSeconds), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0 });
     });
     options.AddFixedWindowLimiter("login", limiterOptions => { limiterOptions.PermitLimit = loginPermitLimit; limiterOptions.Window = TimeSpan.FromSeconds(windowSeconds); limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst; limiterOptions.QueueLimit = 0; });
-    options.AddFixedWindowLimiter("read", limiterOptions => { limiterOptions.PermitLimit = readPermitLimit; limiterOptions.Window = TimeSpan.FromSeconds(windowSeconds); limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0; });
-    options.AddFixedWindowLimiter("write", limiterOptions => { limiterOptions.PermitLimit = writePermitLimit; limiterOptions.Window = TimeSpan.FromSeconds(windowSeconds); limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0; });
+    options.AddFixedWindowLimiter("read", limiterOptions => { limiterOptions.PermitLimit = readPermitLimit; limiterOptions.Window = TimeSpan.FromSeconds(windowSeconds); limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst; limiterOptions.QueueLimit = 0; });
+    options.AddFixedWindowLimiter("write", limiterOptions => { limiterOptions.PermitLimit = writePermitLimit; limiterOptions.Window = TimeSpan.FromSeconds(windowSeconds); limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst; limiterOptions.QueueLimit = 0; });
     options.OnRejected = async (context, cancellationToken) => { var response = context.HttpContext.Response; response.Headers["Retry-After"] = windowSeconds.ToString(); response.ContentType = "application/json"; await response.WriteAsJsonAsync(new { success = false, message = "Çok fazla istek gönderdiniz. Lütfen daha sonra tekrar deneyin.", statusCode = StatusCodes.Status429TooManyRequests }, cancellationToken); };
 });
 
