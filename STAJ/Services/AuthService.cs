@@ -20,14 +20,16 @@ namespace STAJ.Services
             if (kullanici == null || !BCrypt.Net.BCrypt.Verify(sifre, kullanici.Sifre)) return null;
             return kullanici;
         }
-        public async Task<string?> KayitOlAsync(string kullaniciAdi, string sifre)
+        public string? KayitOl(string kullaniciAdi, string sifre)
         {
+            kullaniciAdi = kullaniciAdi?.Trim() ?? string.Empty;
+            sifre ??= string.Empty;
             if (string.IsNullOrWhiteSpace(kullaniciAdi) || string.IsNullOrWhiteSpace(sifre)) return "Kullanıcı adı ve şifre zorunludur.";
             if (kullaniciAdi.Length < 3) return "Kullanıcı adı en az 3 karakter olmalıdır.";
-            if (sifre.Length < 6) return "Şifre en az 6 karakter olmalıdır.";
-            if (await _context.Kullanicilar.AnyAsync(x => x.KullaniciAdi == kullaniciAdi)) return "Bu kullanıcı adı zaten kullanılıyor.";
-            _context.Kullanicilar.Add(new Kullanici { KullaniciAdi = kullaniciAdi.Trim(), Sifre = BCrypt.Net.BCrypt.HashPassword(sifre), Rol = "User" });
-            await _context.SaveChangesAsync();
+            if (sifre.Length < 4) return "Şifre en az 4 karakter olmalıdır.";
+            if (_context.Kullanicilar.Any(x => x.KullaniciAdi == kullaniciAdi)) return "Bu kullanıcı adı zaten kullanılıyor.";
+            _context.Kullanicilar.Add(new Kullanici { KullaniciAdi = kullaniciAdi, Sifre = BCrypt.Net.BCrypt.HashPassword(sifre), Rol = "User" });
+            _context.SaveChanges();
             return null;
         }
         public string TokenOlustur(Kullanici kullanici)
