@@ -45,7 +45,15 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options => { options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters { ValidateIssuer = true, ValidateAudience = true, ValidateLifetime = true, ValidateIssuerSigningKey = true, ValidIssuer = builder.Configuration["Jwt:Issuer"], ValidAudience = builder.Configuration["Jwt:Audience"], IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)) }; });
 builder.Services.AddControllers().ConfigureApiBehaviorOptions(options => { options.InvalidModelStateResponseFactory = context => { var errors = context.ModelState.Where(x => x.Value?.Errors.Count > 0).SelectMany(x => x.Value!.Errors).Select(x => string.IsNullOrWhiteSpace(x.ErrorMessage) ? "Geçersiz veri gönderildi." : x.ErrorMessage).ToList(); return new BadRequestObjectResult(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", errors)); }; });
-builder.Services.AddEndpointsApiExplorer(); builder.Services.AddSwaggerGen(); builder.Services.AddScoped<IMusteriRepository, MusteriRepository>(); builder.Services.AddScoped<MusteriService>(); builder.Services.AddScoped<AuthService>(); builder.Services.AddScoped<MailService>(); builder.Services.AddScoped<IValidator<STAJ.Entities.Musteri>, MusteriValidator>(); builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<IMusteriRepository, MusteriRepository>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<MusteriService>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<MailService>();
+builder.Services.AddScoped<IValidator<STAJ.Entities.Musteri>, MusteriValidator>();
+builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 var app = builder.Build();
 using (var scope = app.Services.CreateScope()) { var context = scope.ServiceProvider.GetRequiredService<AppDbContext>(); await DataSeeder.SeedAsync(context); }
 var localizationOptions = new RequestLocalizationOptions().SetDefaultCulture("tr-TR").AddSupportedCultures(supportedCultures).AddSupportedUICultures(supportedCultures); localizationOptions.RequestCultureProviders.Insert(0, new AcceptLanguageHeaderRequestCultureProvider());
