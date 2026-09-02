@@ -15,7 +15,6 @@ namespace STAJ.Repositories
         public void Ekle(Musteri musteri)
         {
             _context.Musteriler.Add(musteri);
-            _context.SaveChanges();
         }
 
         public void Guncelle(Musteri musteri)
@@ -27,7 +26,6 @@ namespace STAJ.Repositories
             mevcutMusteri.Soyad = musteri.Soyad;
             mevcutMusteri.Telefon = musteri.Telefon;
             mevcutMusteri.Email = musteri.Email;
-            _context.SaveChanges();
         }
 
         public void Sil(int id)
@@ -36,7 +34,6 @@ namespace STAJ.Repositories
             if (musteri != null)
             {
                 _context.Musteriler.Remove(musteri);
-                _context.SaveChanges();
             }
         }
 
