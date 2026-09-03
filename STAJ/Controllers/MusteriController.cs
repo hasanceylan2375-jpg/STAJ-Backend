@@ -12,6 +12,7 @@ using STAJ.Results;
 using STAJ.Resources;
 using STAJ.Services;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace STAJ.Controllers
@@ -27,12 +28,7 @@ namespace STAJ.Controllers
         private readonly AppDbContext _context;
 
         public MusteriController(MusteriService service, IStringLocalizer<SharedResource> localizer, IValidator<Musteri> validator, AppDbContext context)
-        {
-            _service = service;
-            _localizer = localizer;
-            _validator = validator;
-            _context = context;
-        }
+        { _service = service; _localizer = localizer; _validator = validator; _context = context; }
 
         [HttpPost("fotoğraf")]
         [Authorize(Roles = "Admin")]
@@ -77,10 +73,7 @@ namespace STAJ.Controllers
         [HttpGet]
         [EnableRateLimiting("read")]
         public IActionResult Getir([FromQuery] string? search = null, [FromQuery] string? sort = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 5)
-        {
-            var musteriler = _service.Getir(search, sort, page, pageSize);
-            return Ok(new DataResult<object>(true, _localizer["CustomersRetrieved"], musteriler));
-        }
+        { var musteriler = _service.Getir(search, sort, page, pageSize); return Ok(new DataResult<object>(true, _localizer["CustomersRetrieved"], musteriler)); }
 
         [HttpGet("excel")]
         [Authorize(Policy = "AdminOnly")]
@@ -88,82 +81,50 @@ namespace STAJ.Controllers
         public IActionResult ExcelAktar([FromQuery] string? search = null, [FromQuery] string? sort = null)
         {
             var musteriler = _service.Getir(search, sort, 1, 10000);
-            using var workbook = new XLWorkbook();
-            var worksheet = workbook.Worksheets.Add("Müşteriler");
-            worksheet.Cell(1, 1).Value = "ID";
-            worksheet.Cell(1, 2).Value = "Ad";
-            worksheet.Cell(1, 3).Value = "Soyad";
-            worksheet.Cell(1, 4).Value = "Telefon";
-            worksheet.Cell(1, 5).Value = "E-posta";
-            for (int i = 0; i < musteriler.Count; i++)
-            {
-                var musteri = musteriler[i]; var row = i + 2;
-                worksheet.Cell(row, 1).Value = musteri.Id;
-                worksheet.Cell(row, 2).Value = musteri.Ad;
-                worksheet.Cell(row, 3).Value = musteri.Soyad;
-                worksheet.Cell(row, 4).Value = musteri.Telefon;
-                worksheet.Cell(row, 5).Value = musteri.Email;
-            }
-            worksheet.Range(1, 1, 1, 5).Style.Font.Bold = true;
-            worksheet.Columns().AdjustToContents();
-            using var stream = new MemoryStream(); workbook.SaveAs(stream);
+            using var workbook = new XLWorkbook(); var worksheet = workbook.Worksheets.Add("Müşteriler");
+            worksheet.Cell(1, 1).Value = "ID"; worksheet.Cell(1, 2).Value = "Ad"; worksheet.Cell(1, 3).Value = "Soyad"; worksheet.Cell(1, 4).Value = "Telefon"; worksheet.Cell(1, 5).Value = "E-posta";
+            for (int i = 0; i < musteriler.Count; i++) { var m = musteriler[i]; var row = i + 2; worksheet.Cell(row, 1).Value = m.Id; worksheet.Cell(row, 2).Value = m.Ad; worksheet.Cell(row, 3).Value = m.Soyad; worksheet.Cell(row, 4).Value = m.Telefon; worksheet.Cell(row, 5).Value = m.Email; }
+            worksheet.Range(1, 1, 1, 5).Style.Font.Bold = true; worksheet.Columns().AdjustToContents(); using var stream = new MemoryStream(); workbook.SaveAs(stream);
             return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "musteriler.xlsx");
         }
 
         [HttpGet("cursor")]
         [EnableRateLimiting("read")]
         public IActionResult CursorIleGetir([FromQuery] int? lastId = null, [FromQuery] int pageSize = 5)
-        {
-            var musteriler = _service.CursorIleGetir(lastId, pageSize);
-            var nextCursor = musteriler.Count > 0 ? musteriler.Last().Id : (int?)null;
-            return Ok(new DataResult<object>(true, _localizer["CustomersRetrieved"], new { items = musteriler, nextCursor }));
-        }
+        { var musteriler = _service.CursorIleGetir(lastId, pageSize); var nextCursor = musteriler.Count > 0 ? musteriler.Last().Id : (int?)null; return Ok(new DataResult<object>(true, _localizer["CustomersRetrieved"], new { items = musteriler, nextCursor })); }
 
         [HttpGet("{id}")]
         [EnableRateLimiting("read")]
         public IActionResult IdyeGoreGetir(int id)
-        {
-            var musteri = _service.IdyeGoreGetir(id);
-            if (musteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerNotFound"]));
-            return Ok(new DataResult<Musteri>(true, _localizer["CustomerRetrieved"], musteri));
-        }
+        { var musteri = _service.IdyeGoreGetir(id); if (musteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerNotFound"])); return Ok(new DataResult<Musteri>(true, _localizer["CustomerRetrieved"], musteri)); }
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
         [EnableRateLimiting("write")]
         public async Task<IActionResult> Ekle(Musteri musteri, [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey)
         {
-            if (string.IsNullOrWhiteSpace(idempotencyKey))
-                return BadRequest(new DataResult<object>(false, "Idempotency-Key zorunludur."));
+            if (string.IsNullOrWhiteSpace(idempotencyKey)) return BadRequest(new DataResult<object>(false, "Idempotency-Key zorunludur."));
 
-            var existingRecord = await _context.IdempotencyRecords
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Key == idempotencyKey);
+            var requestJson = JsonSerializer.Serialize(musteri);
+            var requestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(requestJson)));
+            var existingRecord = await _context.IdempotencyRecords.AsNoTracking().FirstOrDefaultAsync(x => x.Key == idempotencyKey);
 
             if (existingRecord != null)
             {
-                return StatusCode(existingRecord.StatusCode,
-                    JsonSerializer.Deserialize<object>(existingRecord.Response!));
+                if (existingRecord.RequestHash != requestHash)
+                    return Conflict(new DataResult<object>(false, "Bu Idempotency-Key farklı bir istek için kullanılamaz."));
+
+                return StatusCode(existingRecord.StatusCode, JsonSerializer.Deserialize<object>(existingRecord.Response!));
             }
 
             var validationResult = _validator.Validate(musteri);
-            if (!validationResult.IsValid)
-                return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
-
-            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!))
-                return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No ile kayıtlı bir müşteri zaten var."));
+            if (!validationResult.IsValid) return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
+            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!)) return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No ile kayıtlı bir müşteri zaten var."));
 
             _service.Ekle(musteri);
-
             var response = new DataResult<Musteri>(true, _localizer["CustomerAdded"], musteri);
-            _context.IdempotencyRecords.Add(new IdempotencyRecord
-            {
-                Key = idempotencyKey,
-                Response = JsonSerializer.Serialize(response),
-                StatusCode = StatusCodes.Status200OK
-            });
+            _context.IdempotencyRecords.Add(new IdempotencyRecord { Key = idempotencyKey, RequestHash = requestHash, Response = JsonSerializer.Serialize(response), StatusCode = StatusCodes.Status200OK });
             await _context.SaveChangesAsync();
-
             return Ok(response);
         }
 
@@ -178,19 +139,13 @@ namespace STAJ.Controllers
             var mevcutMusteri = _service.IdyeGoreGetir(id);
             if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToUpdateNotFound"]));
             mevcutMusteri.Ad = musteri.Ad; mevcutMusteri.Soyad = musteri.Soyad; mevcutMusteri.Telefon = musteri.Telefon; mevcutMusteri.Email = musteri.Email; mevcutMusteri.TcKimlikNo = musteri.TcKimlikNo; mevcutMusteri.DogumTarihi = musteri.DogumTarihi; mevcutMusteri.ProfilFotoUrl = musteri.ProfilFotoUrl;
-            _service.Guncelle(mevcutMusteri);
-            return Ok(new DataResult<Musteri>(true, _localizer["CustomerUpdated"], mevcutMusteri));
+            _service.Guncelle(mevcutMusteri); return Ok(new DataResult<Musteri>(true, _localizer["CustomerUpdated"], mevcutMusteri));
         }
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         [EnableRateLimiting("write")]
         public IActionResult Sil(int id)
-        {
-            var mevcutMusteri = _service.IdyeGoreGetir(id);
-            if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToDeleteNotFound"]));
-            _service.Sil(id);
-            return Ok(new DataResult<object>(true, _localizer["CustomerDeleted"]));
-        }
+        { var mevcutMusteri = _service.IdyeGoreGetir(id); if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToDeleteNotFound"])); _service.Sil(id); return Ok(new DataResult<object>(true, _localizer["CustomerDeleted"])); }
     }
 }
