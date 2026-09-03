@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Localization;
 using STAJ.Entities;
 using STAJ.Exceptions;
+using ApiValidationException = STAJ.Exceptions.ValidationException;
 using STAJ.Results;
 using STAJ.Resources;
 using STAJ.Services;
@@ -291,15 +292,15 @@ public class MusteriController : ControllerBase
                     group => group.Key,
                     group => group.Select(error => error.ErrorMessage).ToArray());
 
-            throw new ValidationException("VALIDATION_ERROR", validationErrors);
+            throw new ApiValidationException("VALIDATION_ERROR", validationErrors);
         }
     }
 
-    private static ValidationException ValidationError(
+    private static ApiValidationException ValidationError(
         string propertyName,
         string errorMessage)
     {
-        return new ValidationException(
+        return new ApiValidationException(
             "VALIDATION_ERROR",
             new Dictionary<string, string[]>
             {
