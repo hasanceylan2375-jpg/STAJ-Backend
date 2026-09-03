@@ -4,12 +4,15 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
+using STAJ.Data;
 using STAJ.Entities;
 using STAJ.Results;
 using STAJ.Resources;
 using STAJ.Services;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace STAJ.Controllers
 {
@@ -21,12 +24,14 @@ namespace STAJ.Controllers
         private readonly MusteriService _service;
         private readonly IStringLocalizer<SharedResource> _localizer;
         private readonly IValidator<Musteri> _validator;
+        private readonly AppDbContext _context;
 
-        public MusteriController(MusteriService service, IStringLocalizer<SharedResource> localizer, IValidator<Musteri> validator)
+        public MusteriController(MusteriService service, IStringLocalizer<SharedResource> localizer, IValidator<Musteri> validator, AppDbContext context)
         {
             _service = service;
             _localizer = localizer;
             _validator = validator;
+            _context = context;
         }
 
         [HttpPost("fotoğraf")]
@@ -126,13 +131,40 @@ namespace STAJ.Controllers
         [HttpPost]
         [Authorize(Roles = "Admin")]
         [EnableRateLimiting("write")]
-        public IActionResult Ekle(Musteri musteri)
+        public async Task<IActionResult> Ekle(Musteri musteri, [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey)
         {
+            if (string.IsNullOrWhiteSpace(idempotencyKey))
+                return BadRequest(new DataResult<object>(false, "Idempotency-Key zorunludur."));
+
+            var existingRecord = await _context.IdempotencyRecords
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Key == idempotencyKey);
+
+            if (existingRecord != null)
+            {
+                return StatusCode(existingRecord.StatusCode,
+                    JsonSerializer.Deserialize<object>(existingRecord.Response!));
+            }
+
             var validationResult = _validator.Validate(musteri);
-            if (!validationResult.IsValid) return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
-            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!)) return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No ile kayıtlı bir müşteri zaten var."));
+            if (!validationResult.IsValid)
+                return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
+
+            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!))
+                return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No ile kayıtlı bir müşteri zaten var."));
+
             _service.Ekle(musteri);
-            return Ok(new DataResult<Musteri>(true, _localizer["CustomerAdded"], musteri));
+
+            var response = new DataResult<Musteri>(true, _localizer["CustomerAdded"], musteri);
+            _context.IdempotencyRecords.Add(new IdempotencyRecord
+            {
+                Key = idempotencyKey,
+                Response = JsonSerializer.Serialize(response),
+                StatusCode = StatusCodes.Status200OK
+            });
+            await _context.SaveChangesAsync();
+
+            return Ok(response);
         }
 
         [HttpPut("{id}")]
