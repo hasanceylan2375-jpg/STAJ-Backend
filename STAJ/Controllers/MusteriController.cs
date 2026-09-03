@@ -73,8 +73,17 @@ namespace STAJ.Controllers
         {
             if (string.IsNullOrWhiteSpace(idempotencyKey)) return BadRequest(new DataResult<object>(false, "Idempotency-Key zorunludur."));
             var requestJson = JsonSerializer.Serialize(musteri); var requestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(requestJson)));
-            var existingRecord = await _context.IdempotencyRecords.AsNoTracking().FirstOrDefaultAsync(x => x.Key == idempotencyKey);
-            if (existingRecord != null) { if (existingRecord.RequestHash != requestHash) return Conflict(new DataResult<object>(false, "Bu Idempotency-Key farklı bir istek için kullanılamaz.")); return StatusCode(existingRecord.StatusCode, JsonSerializer.Deserialize<object>(existingRecord.Response!)); }
+            var existingRecord = await _context.IdempotencyRecords.FirstOrDefaultAsync(x => x.Key == idempotencyKey);
+            if (existingRecord != null)
+            {
+                if (existingRecord.ExpireAt <= DateTime.UtcNow)
+                    _context.IdempotencyRecords.Remove(existingRecord);
+                else
+                {
+                    if (existingRecord.RequestHash != requestHash) return Conflict(new DataResult<object>(false, "Bu Idempotency-Key farklı bir istek için kullanılamaz."));
+                    return StatusCode(existingRecord.StatusCode, JsonSerializer.Deserialize<object>(existingRecord.Response!));
+                }
+            }
             var validationResult = _validator.Validate(musteri);
             if (!validationResult.IsValid) return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
             if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!)) return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No ile kayıtlı bir müşteri zaten var."));
@@ -84,7 +93,14 @@ namespace STAJ.Controllers
             {
                 _service.Ekle(musteri);
                 var response = new DataResult<Musteri>(true, _localizer["CustomerAdded"], musteri);
-                _context.IdempotencyRecords.Add(new IdempotencyRecord { Key = idempotencyKey, RequestHash = requestHash, Response = JsonSerializer.Serialize(response), StatusCode = StatusCodes.Status200OK });
+                _context.IdempotencyRecords.Add(new IdempotencyRecord
+                {
+                    Key = idempotencyKey,
+                    RequestHash = requestHash,
+                    Response = JsonSerializer.Serialize(response),
+                    StatusCode = StatusCodes.Status200OK,
+                    ExpireAt = DateTime.UtcNow.AddHours(24)
+                });
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
                 return Ok(response);
