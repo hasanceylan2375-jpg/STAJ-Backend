@@ -10,6 +10,7 @@ namespace STAJ.Data
         public DbSet<Musteri> Musteriler { get; set; }
         public DbSet<Kullanici> Kullanicilar { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -21,6 +22,10 @@ namespace STAJ.Data
 
             modelBuilder.Entity<RefreshToken>()
                 .HasIndex(x => x.Token)
+                .IsUnique();
+
+            modelBuilder.Entity<IdempotencyRecord>()
+                .HasIndex(x => x.Key)
                 .IsUnique();
 
             modelBuilder.Entity<RefreshToken>()
