@@ -14,17 +14,7 @@ namespace STAJ.Services
 
         public void Ekle(Musteri musteri)
         {
-            try
-            {
-                _unitOfWork.BeginTransaction();
-                _unitOfWork.Musteriler.Ekle(musteri);
-                _unitOfWork.Commit();
-            }
-            catch
-            {
-                _unitOfWork.Rollback();
-                throw;
-            }
+            _unitOfWork.Musteriler.Ekle(musteri);
         }
 
         public bool TcKimlikNoVarMi(string tcKimlikNo, int? haricId = null)
