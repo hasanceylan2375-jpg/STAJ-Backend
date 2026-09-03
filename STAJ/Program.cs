@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,8 @@ var supportedCultures = new[] { "tr-TR", "en-US" };
 builder.Services.AddLocalization(options => options.ResourcesPath = "");
 builder.Services.Configure<RequestLocalizationOptions>(options => { options.SetDefaultCulture("tr-TR"); options.AddSupportedCultures(supportedCultures); options.AddSupportedUICultures(supportedCultures); options.RequestCultureProviders.Insert(0, new AcceptLanguageHeaderRequestCultureProvider()); });
 builder.Services.AddCors(options => options.AddPolicy("AngularPolicy", policy => policy.WithOrigins("http://localhost:4200").AllowAnyHeader().AllowAnyMethod()));
+
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, ApiAuthorizationMiddlewareResultHandler>();
 
 builder.Services.AddAuthorization(options =>
 {
