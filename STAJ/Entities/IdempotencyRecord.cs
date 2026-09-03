@@ -8,5 +8,6 @@ namespace STAJ.Entities
         public string? Response { get; set; }
         public int StatusCode { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime ExpireAt { get; set; }
     }
 }
