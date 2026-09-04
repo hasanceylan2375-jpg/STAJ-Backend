@@ -11,6 +11,7 @@ namespace STAJ.Data
         public DbSet<Kullanici> Kullanicilar { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
