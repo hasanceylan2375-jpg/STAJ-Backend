@@ -3,13 +3,12 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using STAJ.Data;
 using STAJ.Entities;
-using STAJ.Hubs;
+using STAJ.Events;
 using STAJ.Results;
 using STAJ.Resources;
 using STAJ.Services;
@@ -28,15 +27,15 @@ namespace STAJ.Controllers
         private readonly IStringLocalizer<SharedResource> _localizer;
         private readonly IValidator<Musteri> _validator;
         private readonly AppDbContext _context;
-        private readonly IHubContext<NotificationHub> _hubContext;
+        private readonly IDomainEventDispatcher _eventDispatcher;
 
-        public MusteriController(MusteriService service, IStringLocalizer<SharedResource> localizer, IValidator<Musteri> validator, AppDbContext context, IHubContext<NotificationHub> hubContext)
+        public MusteriController(MusteriService service, IStringLocalizer<SharedResource> localizer, IValidator<Musteri> validator, AppDbContext context, IDomainEventDispatcher eventDispatcher)
         {
             _service = service;
             _localizer = localizer;
             _validator = validator;
             _context = context;
-            _hubContext = hubContext;
+            _eventDispatcher = eventDispatcher;
         }
 
         [HttpPost("fotoğraf")]
@@ -114,7 +113,7 @@ namespace STAJ.Controllers
                 });
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
-                await _hubContext.Clients.All.SendAsync("musteriEklendi", musteri);
+                await _eventDispatcher.PublishAsync(new MusteriEklendiEvent(musteri));
                 return Ok(response);
             }
             catch
@@ -136,7 +135,7 @@ namespace STAJ.Controllers
             if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToUpdateNotFound"]));
             mevcutMusteri.Ad = musteri.Ad; mevcutMusteri.Soyad = musteri.Soyad; mevcutMusteri.Telefon = musteri.Telefon; mevcutMusteri.Email = musteri.Email; mevcutMusteri.TcKimlikNo = musteri.TcKimlikNo; mevcutMusteri.DogumTarihi = musteri.DogumTarihi; mevcutMusteri.ProfilFotoUrl = musteri.ProfilFotoUrl;
             _service.Guncelle(mevcutMusteri);
-            await _hubContext.Clients.All.SendAsync("musteriGuncellendi", mevcutMusteri);
+            await _eventDispatcher.PublishAsync(new MusteriGuncellendiEvent(mevcutMusteri));
             return Ok(new DataResult<Musteri>(true, _localizer["CustomerUpdated"], mevcutMusteri));
         }
 
@@ -148,7 +147,7 @@ namespace STAJ.Controllers
             var mevcutMusteri = _service.IdyeGoreGetir(id);
             if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToDeleteNotFound"]));
             _service.Sil(id);
-            await _hubContext.Clients.All.SendAsync("musteriSilindi", new { id, ad = mevcutMusteri.Ad, soyad = mevcutMusteri.Soyad });
+            await _eventDispatcher.PublishAsync(new MusteriSilindiEvent(id, mevcutMusteri.Ad, mevcutMusteri.Soyad));
             return Ok(new DataResult<object>(true, _localizer["CustomerDeleted"]));
         }
     }
