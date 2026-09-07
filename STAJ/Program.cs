@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using Serilog;
 using STAJ.Data;
 using STAJ.Events;
@@ -24,11 +25,7 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .Enrich.WithProperty("Application", "STAJ-Backend")
     .WriteTo.Console()
-    .WriteTo.File(
-        "Logs/log-.txt",
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 30,
-        shared: true)
+    .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 30, shared: true)
     .CreateLogger();
 
 try
@@ -47,18 +44,12 @@ try
     });
 
     builder.Services.AddCors(options => options.AddPolicy("AngularPolicy", policy =>
-        policy.WithOrigins("http://localhost:4200")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials()));
+        policy.WithOrigins("http://localhost:4200").AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
     builder.Services.AddMemoryCache();
     builder.Services.AddAutoMapper(cfg => cfg.AddProfile<MusteriProfile>());
     builder.Services.AddSignalR();
-    builder.Services.AddAuthorization(options =>
-    {
-        options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
-    });
+    builder.Services.AddAuthorization(options => options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin")));
 
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
 
@@ -112,8 +103,7 @@ try
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
-                System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
         };
         options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
         {
@@ -121,8 +111,7 @@ try
             {
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notifications"))
-                    context.Token = accessToken;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notifications")) context.Token = accessToken;
                 return Task.CompletedTask;
             }
         };
@@ -132,17 +121,35 @@ try
     {
         options.InvalidModelStateResponseFactory = context =>
         {
-            var errors = context.ModelState
-                .Where(x => x.Value?.Errors.Count > 0)
-                .SelectMany(x => x.Value!.Errors)
-                .Select(x => string.IsNullOrWhiteSpace(x.ErrorMessage) ? "Geçersiz veri gönderildi." : x.ErrorMessage)
-                .ToList();
+            var errors = context.ModelState.Where(x => x.Value?.Errors.Count > 0).SelectMany(x => x.Value!.Errors).Select(x => string.IsNullOrWhiteSpace(x.ErrorMessage) ? "Geçersiz veri gönderildi." : x.ErrorMessage).ToList();
             return new BadRequestObjectResult(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", errors));
         };
     });
 
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    builder.Services.AddSwaggerGen(options =>
+    {
+        options.SwaggerDoc("v1", new OpenApiInfo { Title = "STAJ API", Version = "v1" });
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "JWT token girin. Örnek: Bearer {token}"
+        });
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+                },
+                Array.Empty<string>()
+            }
+        });
+    });
     builder.Services.AddScoped<IMusteriRepository, MusteriRepository>();
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
     builder.Services.AddScoped<MusteriService>();
@@ -161,18 +168,12 @@ try
         await DataSeeder.SeedAsync(context);
     }
 
-    var localizationOptions = new RequestLocalizationOptions()
-        .SetDefaultCulture("tr-TR")
-        .AddSupportedCultures(supportedCultures)
-        .AddSupportedUICultures(supportedCultures);
+    var localizationOptions = new RequestLocalizationOptions().SetDefaultCulture("tr-TR").AddSupportedCultures(supportedCultures).AddSupportedUICultures(supportedCultures);
     localizationOptions.RequestCultureProviders.Insert(0, new AcceptLanguageHeaderRequestCultureProvider());
 
     app.UseRequestLocalization(localizationOptions);
     app.UseMiddleware<CorrelationIdMiddleware>();
-    app.UseSerilogRequestLogging(options =>
-    {
-        options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
-    });
+    app.UseSerilogRequestLogging(options => options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms");
     app.UseMiddleware<ExceptionMiddleware>();
     app.UseCors("AngularPolicy");
     app.UseSwagger();
@@ -195,30 +196,11 @@ try
     var healthCron = builder.Configuration.GetValue<string>("BackgroundJobs:DatabaseHealthCheckCron") ?? "*/30 * * * *";
     var birthdayEmailCron = builder.Configuration.GetValue<string>("BackgroundJobs:BirthdayEmailCron") ?? "0 9 * * *";
 
-    RecurringJob.AddOrUpdate<ScheduledJobsService>(
-        "daily-log-maintenance",
-        job => job.GunlukLogBakimiAsync(),
-        logCron,
-        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+    RecurringJob.AddOrUpdate<ScheduledJobsService>("daily-log-maintenance", job => job.GunlukLogBakimiAsync(), logCron, new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+    RecurringJob.AddOrUpdate<ScheduledJobsService>("database-health-check", job => job.VeritabaniKontroluAsync(), healthCron, new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+    RecurringJob.AddOrUpdate<ScheduledJobsService>("birthday-email", job => job.DogumGunuMailleriAsync(), birthdayEmailCron, new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
-    RecurringJob.AddOrUpdate<ScheduledJobsService>(
-        "database-health-check",
-        job => job.VeritabaniKontroluAsync(),
-        healthCron,
-        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
-
-    RecurringJob.AddOrUpdate<ScheduledJobsService>(
-        "birthday-email",
-        job => job.DogumGunuMailleriAsync(),
-        birthdayEmailCron,
-        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
-
-    Log.Information(
-        "Hangfire zamanlanmış işleri kaydedildi. Log bakım: {LogCron}, DB kontrol: {HealthCron}, Doğum günü maili: {BirthdayEmailCron}",
-        logCron,
-        healthCron,
-        birthdayEmailCron);
-    Log.Information("STAJ Backend başlatıldı. Ortam: {Environment}", app.Environment.EnvironmentName);
+    Log.Information("Hangfire zamanlanmış işleri kaydedildi. Log bakım: {LogCron}, DB kontrol: {HealthCron}, Doğum günü maili: {BirthdayEmailCron}", logCron, healthCron, birthdayEmailCron);
 
     app.MapControllers();
     app.MapHub<NotificationHub>("/hubs/notifications");
@@ -226,9 +208,9 @@ try
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "Application terminated unexpectedly.");
+    Log.Fatal(ex, "STAJ-Backend başlatılırken beklenmeyen hata oluştu.");
 }
 finally
 {
-    Log.CloseAndFlush();
+    await Log.CloseAndFlushAsync();
 }
