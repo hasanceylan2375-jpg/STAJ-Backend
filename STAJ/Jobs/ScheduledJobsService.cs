@@ -13,20 +13,20 @@ namespace STAJ.Jobs
         private readonly ILogger<ScheduledJobsService> _logger;
         private readonly IHubContext<NotificationHub> _hubContext;
         private readonly IConfiguration _configuration;
-        private readonly IEmailService _emailService;
+        private readonly MailService _mailService;
 
         public ScheduledJobsService(
             AppDbContext dbContext,
             ILogger<ScheduledJobsService> logger,
             IHubContext<NotificationHub> hubContext,
             IConfiguration configuration,
-            IEmailService emailService)
+            MailService mailService)
         {
             _dbContext = dbContext;
             _logger = logger;
             _hubContext = hubContext;
             _configuration = configuration;
-            _emailService = emailService;
+            _mailService = mailService;
         }
 
         [AutomaticRetry(Attempts = 3)]
@@ -128,7 +128,7 @@ namespace STAJ.Jobs
                     var subject = "Doğum Gününüz Kutlu Olsun! 🎂";
                     var body = $"<html><body><h2>Doğum Gününüz Kutlu Olsun, {System.Net.WebUtility.HtmlEncode(fullName)}! 🎉</h2><p>Size sağlık, mutluluk ve güzel bir yaş dileriz.</p><p>İyi ki doğdunuz!</p><p><strong>STAJ</strong></p></body></html>";
 
-                    await _emailService.SendAsync(customer.Email!, subject, body);
+                    await _mailService.SendMailAsync(customer.Email!, subject, body);
                     sentCount++;
 
                     _logger.LogInformation(
