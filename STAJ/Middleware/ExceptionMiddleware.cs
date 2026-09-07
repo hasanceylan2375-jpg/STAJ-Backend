@@ -22,12 +22,21 @@ namespace STAJ.Middleware
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Bir hata oluştu: {Message}", ex.Message);
-                await HandleExceptionAsync(context, ex);
+                var correlationId = context.Response.Headers["X-Correlation-ID"].FirstOrDefault()
+                    ?? context.TraceIdentifier;
+
+                _logger.LogError(
+                    ex,
+                    "İstek işlenirken hata oluştu. CorrelationId: {CorrelationId}, Method: {Method}, Path: {Path}",
+                    correlationId,
+                    context.Request.Method,
+                    context.Request.Path);
+
+                await HandleExceptionAsync(context, ex, correlationId);
             }
         }
 
-        private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
+        private static async Task HandleExceptionAsync(HttpContext context, Exception exception, string correlationId)
         {
             var (statusCode, message, errors) = exception switch
             {
@@ -41,13 +50,9 @@ namespace STAJ.Middleware
 
             context.Response.StatusCode = statusCode;
             context.Response.ContentType = "application/json";
+            context.Response.Headers["X-Correlation-ID"] = correlationId;
 
-            var response = new DataResult<Dictionary<string, string[]>?>(
-                false,
-                message,
-                errors
-            );
-
+            var response = new DataResult<Dictionary<string, string[]>?>(false, message, errors);
             await context.Response.WriteAsJsonAsync(response);
         }
     }
