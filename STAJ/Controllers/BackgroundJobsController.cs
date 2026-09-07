@@ -46,11 +46,23 @@ namespace STAJ.Controllers
             });
         }
 
+        [HttpPost("trigger-birthday-emails")]
+        public IActionResult TriggerBirthdayEmails()
+        {
+            var jobId = _backgroundJobClient.Enqueue<ScheduledJobsService>(job => job.DogumGunuMailleriAsync());
+            return Ok(new
+            {
+                jobId,
+                message = "Doğum günü mail işi kuyruğa alındı."
+            });
+        }
+
         [HttpPost("register-recurring-jobs")]
         public IActionResult RegisterRecurringJobs()
         {
             var logCron = _configuration.GetValue<string>("BackgroundJobs:DailyLogMaintenanceCron") ?? "0 3 * * *";
             var healthCron = _configuration.GetValue<string>("BackgroundJobs:DatabaseHealthCheckCron") ?? "*/30 * * * *";
+            var birthdayEmailCron = _configuration.GetValue<string>("BackgroundJobs:BirthdayEmailCron") ?? "0 9 * * *";
 
             _recurringJobManager.AddOrUpdate<ScheduledJobsService>(
                 "daily-log-maintenance",
@@ -64,11 +76,18 @@ namespace STAJ.Controllers
                 healthCron,
                 new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
+            _recurringJobManager.AddOrUpdate<ScheduledJobsService>(
+                "birthday-email",
+                job => job.DogumGunuMailleriAsync(),
+                birthdayEmailCron,
+                new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
             return Ok(new
             {
                 message = "Zamanlanmış işler kaydedildi.",
                 dailyLogMaintenanceCron = logCron,
-                databaseHealthCheckCron = healthCron
+                databaseHealthCheckCron = healthCron,
+                birthdayEmailCron
             });
         }
 
