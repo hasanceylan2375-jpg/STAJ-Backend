@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Serilog;
 using STAJ.Data;
 using STAJ.Events;
@@ -45,24 +45,18 @@ try
 
     builder.Services.AddCors(options => options.AddPolicy("AngularPolicy", policy =>
         policy.WithOrigins("http://localhost:4200").AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
-
     builder.Services.AddMemoryCache();
     builder.Services.AddAutoMapper(cfg => cfg.AddProfile<MusteriProfile>());
     builder.Services.AddSignalR();
     builder.Services.AddAuthorization(options => options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin")));
 
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
-
     builder.Services.AddHangfire(configuration => configuration
         .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
         .UseSimpleAssemblyNameTypeSerializer()
         .UseRecommendedSerializerSettings()
         .UsePostgreSqlStorage(connectionString));
-    builder.Services.AddHangfireServer(options =>
-    {
-        options.WorkerCount = 2;
-        options.Queues = new[] { "default" };
-    });
+    builder.Services.AddHangfireServer(options => { options.WorkerCount = 2; options.Queues = new[] { "default" }; });
 
     var permitLimit = builder.Configuration.GetValue<int>("RateLimiting:PermitLimit", 20);
     var userPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:UserPermitLimit", 30);
@@ -82,10 +76,7 @@ try
             var limit = context.User.Identity?.IsAuthenticated == true ? userPermitLimit : permitLimit;
             return RateLimitPartition.GetFixedWindowLimiter(userId, _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = limit,
-                Window = TimeSpan.FromSeconds(windowSeconds),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0
+                PermitLimit = limit, Window = TimeSpan.FromSeconds(windowSeconds), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0
             });
         });
         options.AddFixedWindowLimiter("login", o => { o.PermitLimit = loginPermitLimit; o.Window = TimeSpan.FromSeconds(windowSeconds); o.QueueLimit = 0; });
@@ -97,12 +88,8 @@ try
     {
         options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidateIssuer = true, ValidateAudience = true, ValidateLifetime = true, ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"], ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
         };
         options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
@@ -132,24 +119,15 @@ try
         options.SwaggerDoc("v1", new OpenApiInfo { Title = "STAJ API", Version = "v1" });
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
-            Name = "Authorization",
-            Type = SecuritySchemeType.Http,
-            Scheme = "bearer",
-            BearerFormat = "JWT",
-            In = ParameterLocation.Header,
+            Name = "Authorization", Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT", In = ParameterLocation.Header,
             Description = "JWT token girin. Örnek: Bearer {token}"
         });
         options.AddSecurityRequirement(new OpenApiSecurityRequirement
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-                },
-                Array.Empty<string>()
-            }
+            { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } }, Array.Empty<string>() }
         });
     });
+
     builder.Services.AddScoped<IMusteriRepository, MusteriRepository>();
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
     builder.Services.AddScoped<MusteriService>();
@@ -161,7 +139,6 @@ try
     builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
     var app = builder.Build();
-
     using (var scope = app.Services.CreateScope())
     {
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -170,7 +147,6 @@ try
 
     var localizationOptions = new RequestLocalizationOptions().SetDefaultCulture("tr-TR").AddSupportedCultures(supportedCultures).AddSupportedUICultures(supportedCultures);
     localizationOptions.RequestCultureProviders.Insert(0, new AcceptLanguageHeaderRequestCultureProvider());
-
     app.UseRequestLocalization(localizationOptions);
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseSerilogRequestLogging(options => options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms");
@@ -201,16 +177,13 @@ try
     RecurringJob.AddOrUpdate<ScheduledJobsService>("birthday-email", job => job.DogumGunuMailleriAsync(), birthdayEmailCron, new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
     Log.Information("Hangfire zamanlanmış işleri kaydedildi. Log bakım: {LogCron}, DB kontrol: {HealthCron}, Doğum günü maili: {BirthdayEmailCron}", logCron, healthCron, birthdayEmailCron);
-
-    app.MapControllers();
-    app.MapHub<NotificationHub>("/hubs/notifications");
     app.Run();
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "STAJ-Backend başlatılırken beklenmeyen hata oluştu.");
+    Log.Fatal(ex, "Uygulama başlatılamadı.");
 }
 finally
 {
-    await Log.CloseAndFlushAsync();
+    Log.CloseAndFlush();
 }
