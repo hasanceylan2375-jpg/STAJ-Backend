@@ -193,6 +193,7 @@ try
 
     var logCron = builder.Configuration.GetValue<string>("BackgroundJobs:DailyLogMaintenanceCron") ?? "0 3 * * *";
     var healthCron = builder.Configuration.GetValue<string>("BackgroundJobs:DatabaseHealthCheckCron") ?? "*/30 * * * *";
+    var birthdayEmailCron = builder.Configuration.GetValue<string>("BackgroundJobs:BirthdayEmailCron") ?? "0 9 * * *";
 
     RecurringJob.AddOrUpdate<ScheduledJobsService>(
         "daily-log-maintenance",
@@ -206,7 +207,17 @@ try
         healthCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
 
-    Log.Information("Hangfire zamanlanmış işleri kaydedildi. Log bakım: {LogCron}, DB kontrol: {HealthCron}", logCron, healthCron);
+    RecurringJob.AddOrUpdate<ScheduledJobsService>(
+        "birthday-email",
+        job => job.DogumGunuMailleriAsync(),
+        birthdayEmailCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
+    Log.Information(
+        "Hangfire zamanlanmış işleri kaydedildi. Log bakım: {LogCron}, DB kontrol: {HealthCron}, Doğum günü maili: {BirthdayEmailCron}",
+        logCron,
+        healthCron,
+        birthdayEmailCron);
     Log.Information("STAJ Backend başlatıldı. Ortam: {Environment}", app.Environment.EnvironmentName);
 
     app.MapControllers();
