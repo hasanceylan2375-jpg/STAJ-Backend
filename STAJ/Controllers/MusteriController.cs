@@ -3,11 +3,13 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using STAJ.Data;
 using STAJ.Entities;
+using STAJ.Hubs;
 using STAJ.Results;
 using STAJ.Resources;
 using STAJ.Services;
@@ -26,7 +28,16 @@ namespace STAJ.Controllers
         private readonly IStringLocalizer<SharedResource> _localizer;
         private readonly IValidator<Musteri> _validator;
         private readonly AppDbContext _context;
-        public MusteriController(MusteriService service, IStringLocalizer<SharedResource> localizer, IValidator<Musteri> validator, AppDbContext context) { _service = service; _localizer = localizer; _validator = validator; _context = context; }
+        private readonly IHubContext<NotificationHub> _hubContext;
+
+        public MusteriController(MusteriService service, IStringLocalizer<SharedResource> localizer, IValidator<Musteri> validator, AppDbContext context, IHubContext<NotificationHub> hubContext)
+        {
+            _service = service;
+            _localizer = localizer;
+            _validator = validator;
+            _context = context;
+            _hubContext = hubContext;
+        }
 
         [HttpPost("fotoğraf")]
         [Authorize(Roles = "Admin")]
@@ -103,6 +114,7 @@ namespace STAJ.Controllers
                 });
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+                await _hubContext.Clients.All.SendAsync("musteriEklendi", musteri);
                 return Ok(response);
             }
             catch
@@ -115,11 +127,29 @@ namespace STAJ.Controllers
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
         [EnableRateLimiting("write")]
-        public IActionResult Guncelle(int id, Musteri musteri) { var validationResult = _validator.Validate(musteri); if (!validationResult.IsValid) return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList())); if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!, id)) return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No başka bir müşteriye ait.")); var mevcutMusteri = _service.IdyeGoreGetir(id); if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToUpdateNotFound"])); mevcutMusteri.Ad = musteri.Ad; mevcutMusteri.Soyad = musteri.Soyad; mevcutMusteri.Telefon = musteri.Telefon; mevcutMusteri.Email = musteri.Email; mevcutMusteri.TcKimlikNo = musteri.TcKimlikNo; mevcutMusteri.DogumTarihi = musteri.DogumTarihi; mevcutMusteri.ProfilFotoUrl = musteri.ProfilFotoUrl; _service.Guncelle(mevcutMusteri); return Ok(new DataResult<Musteri>(true, _localizer["CustomerUpdated"], mevcutMusteri)); }
+        public async Task<IActionResult> Guncelle(int id, Musteri musteri)
+        {
+            var validationResult = _validator.Validate(musteri);
+            if (!validationResult.IsValid) return BadRequest(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", validationResult.Errors.Select(x => x.ErrorMessage).ToList()));
+            if (_service.TcKimlikNoVarMi(musteri.TcKimlikNo!, id)) return BadRequest(new DataResult<object>(false, "Bu T.C. Kimlik No başka bir müşteriye ait."));
+            var mevcutMusteri = _service.IdyeGoreGetir(id);
+            if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToUpdateNotFound"]));
+            mevcutMusteri.Ad = musteri.Ad; mevcutMusteri.Soyad = musteri.Soyad; mevcutMusteri.Telefon = musteri.Telefon; mevcutMusteri.Email = musteri.Email; mevcutMusteri.TcKimlikNo = musteri.TcKimlikNo; mevcutMusteri.DogumTarihi = musteri.DogumTarihi; mevcutMusteri.ProfilFotoUrl = musteri.ProfilFotoUrl;
+            _service.Guncelle(mevcutMusteri);
+            await _hubContext.Clients.All.SendAsync("musteriGuncellendi", mevcutMusteri);
+            return Ok(new DataResult<Musteri>(true, _localizer["CustomerUpdated"], mevcutMusteri));
+        }
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         [EnableRateLimiting("write")]
-        public IActionResult Sil(int id) { var mevcutMusteri = _service.IdyeGoreGetir(id); if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToDeleteNotFound"])); _service.Sil(id); return Ok(new DataResult<object>(true, _localizer["CustomerDeleted"])); }
+        public async Task<IActionResult> Sil(int id)
+        {
+            var mevcutMusteri = _service.IdyeGoreGetir(id);
+            if (mevcutMusteri == null) return NotFound(new DataResult<object>(false, _localizer["CustomerToDeleteNotFound"]));
+            _service.Sil(id);
+            await _hubContext.Clients.All.SendAsync("musteriSilindi", new { id, ad = mevcutMusteri.Ad, soyad = mevcutMusteri.Soyad });
+            return Ok(new DataResult<object>(true, _localizer["CustomerDeleted"]));
+        }
     }
 }
