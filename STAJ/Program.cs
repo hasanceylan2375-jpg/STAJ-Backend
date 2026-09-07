@@ -1,6 +1,8 @@
 using System.Threading.RateLimiting;
 using AutoMapper;
 using FluentValidation;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -9,6 +11,7 @@ using Serilog;
 using STAJ.Data;
 using STAJ.Events;
 using STAJ.Hubs;
+using STAJ.Jobs;
 using STAJ.Middleware;
 using STAJ.Profiles;
 using STAJ.Repositories;
@@ -55,6 +58,19 @@ try
     builder.Services.AddAuthorization(options =>
     {
         options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+    });
+
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+
+    builder.Services.AddHangfire(configuration => configuration
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UsePostgreSqlStorage(connectionString));
+    builder.Services.AddHangfireServer(options =>
+    {
+        options.WorkerCount = 2;
+        options.Queues = new[] { "default" };
     });
 
     var permitLimit = builder.Configuration.GetValue<int>("RateLimiting:PermitLimit", 20);
@@ -134,7 +150,8 @@ try
     builder.Services.AddScoped<MailService>();
     builder.Services.AddScoped<IDomainEventDispatcher, SignalRDomainEventDispatcher>();
     builder.Services.AddScoped<IValidator<STAJ.Entities.Musteri>, MusteriValidator>();
-    builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    builder.Services.AddScoped<ScheduledJobsService>();
+    builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
     var app = builder.Build();
 
@@ -168,6 +185,28 @@ try
     app.UseAuthorization();
     app.UseMiddleware<AuditMiddleware>();
 
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = new[] { new HangfireDashboardAuthorizationFilter() },
+        IsReadOnlyFunc = _ => false
+    });
+
+    var logCron = builder.Configuration.GetValue<string>("BackgroundJobs:DailyLogMaintenanceCron") ?? "0 3 * * *";
+    var healthCron = builder.Configuration.GetValue<string>("BackgroundJobs:DatabaseHealthCheckCron") ?? "*/30 * * * *";
+
+    RecurringJob.AddOrUpdate<ScheduledJobsService>(
+        "daily-log-maintenance",
+        job => job.GunlukLogBakimiAsync(),
+        logCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
+    RecurringJob.AddOrUpdate<ScheduledJobsService>(
+        "database-health-check",
+        job => job.VeritabaniKontroluAsync(),
+        healthCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
+
+    Log.Information("Hangfire zamanlanmış işleri kaydedildi. Log bakım: {LogCron}, DB kontrol: {HealthCron}", logCron, healthCron);
     Log.Information("STAJ Backend başlatıldı. Ortam: {Environment}", app.Environment.EnvironmentName);
 
     app.MapControllers();
