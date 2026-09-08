@@ -15,9 +15,11 @@ namespace STAJ.Services
         };
 
         private readonly Cloudinary _cloudinary;
+        private readonly ILogger<CloudinaryImageService> _logger;
 
-        public CloudinaryImageService(IConfiguration configuration)
+        public CloudinaryImageService(IConfiguration configuration, ILogger<CloudinaryImageService> logger)
         {
+            _logger = logger;
             var cloudName = configuration["Cloudinary:CloudName"];
             var apiKey = configuration["Cloudinary:ApiKey"];
             var apiSecret = configuration["Cloudinary:ApiSecret"];
@@ -31,43 +33,43 @@ namespace STAJ.Services
         public async Task<string> UploadAsync(IFormFile file, CancellationToken cancellationToken = default)
         {
             Validate(file);
+            _logger.LogInformation("Cloudinary görsel yükleme başladı. Dosya: {FileName}, Boyut: {FileSize}, Tip: {ContentType}", file.FileName, file.Length, file.ContentType);
 
             await using var stream = file.OpenReadStream();
-            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            var publicId = $"{Guid.NewGuid():N}";
-
             var uploadParams = new ImageUploadParams
             {
                 File = new FileDescription(file.FileName, stream),
                 Folder = "staj-images",
-                PublicId = publicId,
+                PublicId = $"{Guid.NewGuid():N}",
                 Overwrite = false
             };
 
             var result = await _cloudinary.UploadAsync(uploadParams, cancellationToken);
             if (result.Error is not null)
+            {
+                _logger.LogError("Cloudinary görsel yükleme başarısız. {ErrorMessage}", result.Error.Message);
                 throw new InvalidOperationException($"Cloudinary görsel yükleme hatası: {result.Error.Message}");
+            }
 
             if (result.SecureUrl is null)
                 throw new InvalidOperationException("Cloudinary güvenli görsel URL'si döndürmedi.");
 
-            return result.SecureUrl.AbsoluteUri;
+            var url = result.SecureUrl.AbsoluteUri;
+            _logger.LogInformation("Cloudinary görsel yükleme tamamlandı. URL: {Url}", url);
+            return url;
         }
 
         private static void Validate(IFormFile file)
         {
             if (file is null || file.Length == 0)
                 throw new ArgumentException("Görsel dosyası boş olamaz.");
-
             if (file.Length > 5 * 1024 * 1024)
                 throw new ArgumentException("Görsel en fazla 5 MB olabilir.");
 
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
             if (!AllowedTypes.TryGetValue(extension, out var expectedContentType)
                 || !string.Equals(file.ContentType, expectedContentType, StringComparison.OrdinalIgnoreCase))
-            {
                 throw new ArgumentException("Sadece JPG, JPEG, PNG, WebP veya SVG görseller kabul edilir.");
-            }
         }
     }
 }
