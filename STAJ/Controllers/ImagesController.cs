@@ -8,37 +8,34 @@ namespace STAJ.Controllers
     [Route("api/[controller]")]
     public class ImagesController : ControllerBase
     {
-        private readonly ImageStorageService _storage;
-        public ImagesController(ImageStorageService storage) => _storage = storage;
+        private readonly CloudinaryImageService _imageService;
 
-        [HttpPost]
+        public ImagesController(CloudinaryImageService imageService)
+        {
+            _imageService = imageService;
+        }
+
+        [HttpPost("upload")]
         [Authorize(Roles = "Admin")]
         [RequestSizeLimit(5 * 1024 * 1024)]
         public async Task<IActionResult> Upload(IFormFile file, CancellationToken cancellationToken)
         {
-            if (file is null) return BadRequest("Görsel dosyası gönderilmelidir.");
+            if (file is null)
+                return BadRequest("Görsel dosyası gönderilmelidir.");
+
             try
             {
-                var id = await _storage.AddAsync(file, cancellationToken);
-                return Ok(new { id, url = $"/api/Images/{id}" });
+                var url = await _imageService.UploadAsync(file, cancellationToken);
+                return Ok(new { url });
             }
-            catch (ArgumentException ex) { return BadRequest(ex.Message); }
-        }
-
-        [HttpGet("{id}")]
-        [AllowAnonymous]
-        public async Task<IActionResult> Get(string id, CancellationToken cancellationToken)
-        {
-            var image = await _storage.GetAsync(id, cancellationToken);
-            return image is null ? NotFound() : File(image.Value.Data, image.Value.ContentType);
-        }
-
-        [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Delete(string id, CancellationToken cancellationToken)
-        {
-            await _storage.DeleteAsync(id, cancellationToken);
-            return NoContent();
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return StatusCode(StatusCodes.Status502BadGateway, ex.Message);
+            }
         }
     }
 }
