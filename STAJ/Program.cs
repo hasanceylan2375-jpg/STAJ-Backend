@@ -75,16 +75,12 @@ try
     });
 
     builder.Services.AddCors(options => options.AddPolicy("AngularPolicy", policy =>
-        policy.WithOrigins(allowedOrigins)
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials()));
+        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
     builder.Services.AddMemoryCache();
     builder.Services.AddAutoMapper(cfg => cfg.AddProfile<MusteriProfile>());
     builder.Services.AddSignalR();
-    builder.Services.AddAuthorization(options =>
-        options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin")));
+    builder.Services.AddAuthorization(options => options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin")));
 
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
     builder.Services.AddHangfire(configuration => configuration
@@ -244,11 +240,8 @@ try
     app.UseMiddleware<ExceptionMiddleware>();
     app.UseCors("AngularPolicy");
     if (!app.Environment.IsDevelopment())
-    {
         app.UseHsts();
-    }
     app.UseHttpsRedirection();
-    app.UseStaticFiles();
     app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();
