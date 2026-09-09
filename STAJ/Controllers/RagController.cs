@@ -18,10 +18,11 @@ public sealed class RagController : ControllerBase
 
     [HttpPost("documents/upload")]
     [Authorize(Policy = "AdminOnly")]
+    [Consumes("multipart/form-data")]
     [RequestSizeLimit(10 * 1024 * 1024)]
     public async Task<IActionResult> UploadDocument(
         [FromForm] string companyName,
-        [FromForm] IFormFile file,
+        IFormFile file,
         CancellationToken cancellationToken)
     {
         try
