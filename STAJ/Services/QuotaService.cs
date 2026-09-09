@@ -1,42 +1,51 @@
-using System.Collections.Concurrent;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace STAJ.Services
 {
     public sealed class QuotaService
     {
-        private sealed class Counter
-        {
-            public int Daily;
-            public int Monthly;
-        }
+        private readonly IMemoryCache _cache;
+        private readonly object _sync = new();
 
-        private readonly ConcurrentDictionary<string, Counter> _counters = new();
+        public QuotaService(IMemoryCache cache)
+        {
+            _cache = cache;
+        }
 
         public bool TryConsume(string key, int dailyLimit, int monthlyLimit, out int dailyRemaining, out int monthlyRemaining)
         {
-            var counter = _counters.GetOrAdd(BuildKey(key), _ => new Counter());
-
-            lock (counter)
+            lock (_sync)
             {
-                if (counter.Daily >= dailyLimit || counter.Monthly >= monthlyLimit)
+                var now = DateTime.UtcNow;
+                var dailyKey = $"quota:day:{now:yyyy-MM-dd}:{key}";
+                var monthlyKey = $"quota:month:{now:yyyy-MM}:{key}";
+
+                var daily = _cache.Get<int>(dailyKey);
+                var monthly = _cache.Get<int>(monthlyKey);
+
+                if (daily >= dailyLimit || monthly >= monthlyLimit)
                 {
-                    dailyRemaining = Math.Max(0, dailyLimit - counter.Daily);
-                    monthlyRemaining = Math.Max(0, monthlyLimit - counter.Monthly);
+                    dailyRemaining = Math.Max(0, dailyLimit - daily);
+                    monthlyRemaining = Math.Max(0, monthlyLimit - monthly);
                     return false;
                 }
 
-                counter.Daily++;
-                counter.Monthly++;
-                dailyRemaining = Math.Max(0, dailyLimit - counter.Daily);
-                monthlyRemaining = Math.Max(0, monthlyLimit - counter.Monthly);
+                daily++;
+                monthly++;
+
+                _cache.Set(dailyKey, daily, new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpiration = now.Date.AddDays(1)
+                });
+                _cache.Set(monthlyKey, monthly, new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpiration = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(1)
+                });
+
+                dailyRemaining = Math.Max(0, dailyLimit - daily);
+                monthlyRemaining = Math.Max(0, monthlyLimit - monthly);
                 return true;
             }
-        }
-
-        private static string BuildKey(string key)
-        {
-            var now = DateTime.UtcNow;
-            return $"{key}:{now:yyyy-MM}:{now:yyyy-MM-dd}";
         }
     }
 }
