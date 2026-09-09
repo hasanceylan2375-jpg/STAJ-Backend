@@ -15,6 +15,7 @@ namespace STAJ.Data
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<WorkflowRequest> WorkflowRequests { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -23,6 +24,8 @@ namespace STAJ.Data
             modelBuilder.Entity<Musteri>().HasIndex(x => x.TcKimlikNo).IsUnique();
             modelBuilder.Entity<RefreshToken>().HasIndex(x => x.Token).IsUnique();
             modelBuilder.Entity<IdempotencyRecord>().HasIndex(x => x.Key).IsUnique();
+            modelBuilder.Entity<WorkflowRequest>().HasIndex(x => new { x.Type, x.Status });
+            modelBuilder.Entity<WorkflowRequest>().HasIndex(x => x.RequestedBy);
 
             modelBuilder.Entity<RefreshToken>()
                 .HasOne(x => x.User)
