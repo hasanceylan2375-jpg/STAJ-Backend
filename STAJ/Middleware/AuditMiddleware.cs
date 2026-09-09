@@ -34,12 +34,12 @@ namespace STAJ.Middleware
                         var auditLog = new AuditLog
                         {
                             KullaniciAdi = context.User.Identity?.IsAuthenticated == true
-                                ? context.User.Identity?.Name
+                                ? SanitizeForAudit(context.User.Identity?.Name, 256)
                                 : null,
-                            HttpMethod = context.Request.Method,
-                            Path = context.Request.Path.Value ?? string.Empty,
+                            HttpMethod = SanitizeForAudit(context.Request.Method, 16),
+                            Path = SanitizeForAudit(context.Request.Path.Value, 2048),
                             StatusCode = context.Response.StatusCode,
-                            IpAddress = context.Connection.RemoteIpAddress?.ToString(),
+                            IpAddress = SanitizeForAudit(context.Connection.RemoteIpAddress?.ToString(), 64),
                             DurationMs = stopwatch.ElapsedMilliseconds
                         };
 
@@ -52,6 +52,21 @@ namespace STAJ.Middleware
                     }
                 }
             }
+        }
+
+        private static string? SanitizeForAudit(string? value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return value;
+
+            var sanitized = new string(value
+                .Where(character => !char.IsControl(character))
+                .ToArray())
+                .Replace('\r', ' ')
+                .Replace('\n', ' ')
+                .Trim();
+
+            return sanitized.Length <= maxLength ? sanitized : sanitized[..maxLength];
         }
     }
 }
