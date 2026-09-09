@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="STAJ/STAJ.csproj" />
+  <Project Path="STAJ.Tests/STAJ.Tests.csproj" />
 </Solution>
