@@ -16,7 +16,7 @@ namespace STAJ.Controllers
         }
 
         [HttpPost("upload")]
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         [RequestSizeLimit(5 * 1024 * 1024)]
         public async Task<IActionResult> Upload(IFormFile file, CancellationToken cancellationToken)
         {
