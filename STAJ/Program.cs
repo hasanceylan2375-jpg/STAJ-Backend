@@ -253,6 +253,8 @@ try
     app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseMiddleware<QuotaMiddleware>();
+    app.UseMiddleware<BulkheadBackpressureMiddleware>();
     app.UseMiddleware<CsrfProtectionMiddleware>();
     app.UseMiddleware<AuditMiddleware>();
 
