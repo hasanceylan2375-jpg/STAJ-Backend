@@ -34,7 +34,7 @@ namespace STAJ.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                return StatusCode(StatusCodes.Status502BadGateway, ex.Message);
+                return StatusCode(StatusCodes.Status502BadGateway, "Görsel depolama servisi şu anda kullanılamıyor.");
             }
         }
     }
