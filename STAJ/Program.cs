@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.OpenApi;
+using Pgvector.EntityFrameworkCore;
 using Serilog;
 using STAJ.Data;
 using STAJ.Events;
@@ -39,14 +40,8 @@ try
 
     var supportedCultures = new[] { "tr-TR", "en-US" };
     var allowedOrigins = builder.Configuration.GetSection("Security:AllowedOrigins")
-        .GetChildren()
-        .Select(x => x.Value)
-        .Where(x => !string.IsNullOrWhiteSpace(x))
-        .Cast<string>()
-        .ToArray();
-
-    if (allowedOrigins.Length == 0)
-        allowedOrigins = ["http://localhost:4200"];
+        .GetChildren().Select(x => x.Value).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray();
+    if (allowedOrigins.Length == 0) allowedOrigins = ["http://localhost:4200"];
 
     var jwtKey = builder.Configuration["Jwt:Key"];
     if (string.IsNullOrWhiteSpace(jwtKey))
@@ -57,14 +52,9 @@ try
             builder.Configuration["Jwt:Key"] = jwtKey;
             Log.Warning("Development ortamında geçici JWT anahtarı üretildi. Uygulama yeniden başlatıldığında mevcut access tokenlar geçersiz olur.");
         }
-        else
-        {
-            throw new InvalidOperationException("Production ortamında Jwt:Key gizli yapılandırma olarak tanımlanmalıdır.");
-        }
+        else throw new InvalidOperationException("Production ortamında Jwt:Key gizli yapılandırma olarak tanımlanmalıdır.");
     }
-
-    if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
-        throw new InvalidOperationException("Jwt:Key en az 32 byte olmalıdır.");
+    if (Encoding.UTF8.GetByteCount(jwtKey) < 32) throw new InvalidOperationException("Jwt:Key en az 32 byte olmalıdır.");
 
     builder.Services.AddLocalization(options => options.ResourcesPath = "");
     builder.Services.Configure<RequestLocalizationOptions>(options =>
@@ -74,10 +64,7 @@ try
         options.AddSupportedUICultures(supportedCultures);
         options.RequestCultureProviders.Insert(0, new AcceptLanguageHeaderRequestCultureProvider());
     });
-
-    builder.Services.AddCors(options => options.AddPolicy("AngularPolicy", policy =>
-        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
-
+    builder.Services.AddCors(options => options.AddPolicy("AngularPolicy", policy => policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
     builder.Services.AddMemoryCache();
     builder.Services.AddAutoMapper(cfg => cfg.AddProfile<MusteriProfile>());
     builder.Services.AddSignalR();
@@ -89,11 +76,7 @@ try
         .UseSimpleAssemblyNameTypeSerializer()
         .UseRecommendedSerializerSettings()
         .UsePostgreSqlStorage(connectionString));
-    builder.Services.AddHangfireServer(options =>
-    {
-        options.WorkerCount = 2;
-        options.Queues = new[] { "default" };
-    });
+    builder.Services.AddHangfireServer(options => { options.WorkerCount = 2; options.Queues = new[] { "default" }; });
 
     var permitLimit = builder.Configuration.GetValue<int>("RateLimiting:PermitLimit", 20);
     var userPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:UserPermitLimit", 30);
@@ -114,100 +97,54 @@ try
             var limit = context.User.Identity?.IsAuthenticated == true ? userPermitLimit : permitLimit;
             return RateLimitPartition.GetFixedWindowLimiter(userId, _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = limit,
-                Window = TimeSpan.FromSeconds(windowSeconds),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0
+                PermitLimit = limit, Window = TimeSpan.FromSeconds(windowSeconds), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0
             });
         });
-        options.AddFixedWindowLimiter("login", o =>
-        {
-            o.PermitLimit = loginPermitLimit;
-            o.Window = TimeSpan.FromSeconds(windowSeconds);
-            o.QueueLimit = 0;
-        });
-        options.AddFixedWindowLimiter("auth", o =>
-        {
-            o.PermitLimit = authPermitLimit;
-            o.Window = TimeSpan.FromSeconds(windowSeconds);
-            o.QueueLimit = 0;
-        });
-        options.AddFixedWindowLimiter("read", o =>
-        {
-            o.PermitLimit = readPermitLimit;
-            o.Window = TimeSpan.FromSeconds(windowSeconds);
-            o.QueueLimit = 0;
-        });
-        options.AddFixedWindowLimiter("write", o =>
-        {
-            o.PermitLimit = writePermitLimit;
-            o.Window = TimeSpan.FromSeconds(windowSeconds);
-            o.QueueLimit = 0;
-        });
+        options.AddFixedWindowLimiter("login", o => { o.PermitLimit = loginPermitLimit; o.Window = TimeSpan.FromSeconds(windowSeconds); o.QueueLimit = 0; });
+        options.AddFixedWindowLimiter("auth", o => { o.PermitLimit = authPermitLimit; o.Window = TimeSpan.FromSeconds(windowSeconds); o.QueueLimit = 0; });
+        options.AddFixedWindowLimiter("read", o => { o.PermitLimit = readPermitLimit; o.Window = TimeSpan.FromSeconds(windowSeconds); o.QueueLimit = 0; });
+        options.AddFixedWindowLimiter("write", o => { o.PermitLimit = writePermitLimit; o.Window = TimeSpan.FromSeconds(windowSeconds); o.QueueLimit = 0; });
     });
 
     builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
     {
         options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            ClockSkew = TimeSpan.FromSeconds(30)
+            ValidateIssuer = true, ValidateAudience = true, ValidateLifetime = true, ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"], ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)), ClockSkew = TimeSpan.FromSeconds(30)
         };
         options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
         {
             OnMessageReceived = context =>
             {
                 var accessToken = context.Request.Query["access_token"];
-                var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notifications"))
-                    context.Token = accessToken;
+                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs/notifications")) context.Token = accessToken;
                 return Task.CompletedTask;
             }
         };
     });
 
-    builder.Services.AddControllers()
-        .AddJsonOptions(options =>
+    builder.Services.AddControllers().AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Encoder = JavaScriptEncoder.Default;
+        options.JsonSerializerOptions.MaxDepth = 32;
+    }).ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
         {
-            options.JsonSerializerOptions.Encoder = JavaScriptEncoder.Default;
-            options.JsonSerializerOptions.MaxDepth = 32;
-        })
-        .ConfigureApiBehaviorOptions(options =>
-        {
-            options.InvalidModelStateResponseFactory = context =>
-            {
-                var errors = context.ModelState
-                    .Where(x => x.Value?.Errors.Count > 0)
-                    .SelectMany(x => x.Value!.Errors)
-                    .Select(x => string.IsNullOrWhiteSpace(x.ErrorMessage) ? "Geçersiz veri gönderildi." : x.ErrorMessage)
-                    .ToList();
-                return new BadRequestObjectResult(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", errors));
-            };
-        });
+            var errors = context.ModelState.Where(x => x.Value?.Errors.Count > 0).SelectMany(x => x.Value!.Errors)
+                .Select(x => string.IsNullOrWhiteSpace(x.ErrorMessage) ? "Geçersiz veri gönderildi." : x.ErrorMessage).ToList();
+            return new BadRequestObjectResult(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", errors));
+        };
+    });
 
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
         options.SwaggerDoc("v1", new OpenApiInfo { Title = "STAJ API", Version = "v1" });
-        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-        {
-            Name = "Authorization",
-            Type = SecuritySchemeType.Http,
-            Scheme = "bearer",
-            BearerFormat = "JWT",
-            In = ParameterLocation.Header,
-            Description = "JWT token girin. Örnek: Bearer {token}"
-        });
-        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-        {
-            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
-        });
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme { Name = "Authorization", Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT", In = ParameterLocation.Header, Description = "JWT token girin. Örnek: Bearer {token}" });
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("Bearer", document)] = [] });
     });
 
     builder.Services.AddScoped<IMusteriRepository, MusteriRepository>();
@@ -219,12 +156,13 @@ try
     builder.Services.AddScoped<IDomainEventDispatcher, SignalRDomainEventDispatcher>();
     builder.Services.AddScoped<IValidator<STAJ.Entities.Musteri>, MusteriValidator>();
     builder.Services.AddScoped<ScheduledJobsService>();
-    builder.Services.AddDbContext<AppDbContext>(options => options
-        .UseNpgsql(connectionString)
-        .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning)));
+    builder.Services.AddSingleton<RagTextExtractor>();
+    builder.Services.AddSingleton<RagChunker>();
+    builder.Services.AddHttpClient<RagOpenAiService>();
+    builder.Services.AddScoped<RagService>();
+    builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.UseVector()).ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
     var app = builder.Build();
-
     using (var scope = app.Services.CreateScope())
     {
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -234,12 +172,8 @@ try
         await context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS \"IX_WorkflowRequests_RequestedBy\" ON \"WorkflowRequests\" (\"RequestedBy\");");
     }
 
-    var localizationOptions = new RequestLocalizationOptions()
-        .SetDefaultCulture("tr-TR")
-        .AddSupportedCultures(supportedCultures)
-        .AddSupportedUICultures(supportedCultures);
+    var localizationOptions = new RequestLocalizationOptions().SetDefaultCulture("tr-TR").AddSupportedCultures(supportedCultures).AddSupportedUICultures(supportedCultures);
     localizationOptions.RequestCultureProviders.Insert(0, new AcceptLanguageHeaderRequestCultureProvider());
-
     app.UseRequestLocalization(localizationOptions);
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<InputSanitizationMiddleware>();
@@ -248,8 +182,7 @@ try
     app.UseSerilogRequestLogging(options => options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms");
     app.UseMiddleware<ExceptionMiddleware>();
     app.UseCors("AngularPolicy");
-    if (!app.Environment.IsDevelopment())
-        app.UseHsts();
+    if (!app.Environment.IsDevelopment()) app.UseHsts();
     app.UseHttpsRedirection();
     app.UseRateLimiter();
     app.UseAuthentication();
@@ -259,26 +192,15 @@ try
     app.UseMiddleware<CsrfProtectionMiddleware>();
     app.UseMiddleware<AuditMiddleware>();
 
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI();
-    }
-
-    app.UseHangfireDashboard("/hangfire", new DashboardOptions
-    {
-        Authorization = new[] { new HangfireDashboardAuthorizationFilter() },
-        IsReadOnlyFunc = _ => false
-    });
+    if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions { Authorization = new[] { new HangfireDashboardAuthorizationFilter() }, IsReadOnlyFunc = _ => false });
 
     var logCron = builder.Configuration.GetValue<string>("BackgroundJobs:DailyLogMaintenanceCron") ?? "0 3 * * *";
     var healthCron = builder.Configuration.GetValue<string>("BackgroundJobs:DatabaseHealthCheckCron") ?? "*/30 * * * *";
     var birthdayEmailCron = builder.Configuration.GetValue<string>("BackgroundJobs:BirthdayEmailCron") ?? "0 9 * * *";
-
     RecurringJob.AddOrUpdate<ScheduledJobsService>("daily-log-maintenance", job => job.GunlukLogBakimiAsync(), logCron, new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
     RecurringJob.AddOrUpdate<ScheduledJobsService>("database-health-check", job => job.VeritabaniKontroluAsync(), healthCron, new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
     RecurringJob.AddOrUpdate<ScheduledJobsService>("birthday-email", job => job.DogumGunuMailleriAsync(), birthdayEmailCron, new RecurringJobOptions { TimeZone = TimeZoneInfo.Local });
-
     Log.Information("Hangfire zamanlanmış işleri kaydedildi. Log bakım: {LogCron}, DB kontrol: {HealthCron}, Doğum günü maili: {BirthdayEmailCron}", logCron, healthCron, birthdayEmailCron);
 
     app.MapControllers();
