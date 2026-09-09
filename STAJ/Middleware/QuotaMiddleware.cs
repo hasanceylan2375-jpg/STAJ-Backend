@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using STAJ.Services;
 
 namespace STAJ.Middleware
@@ -8,11 +9,11 @@ namespace STAJ.Middleware
         private readonly IConfiguration _configuration;
         private readonly QuotaService _quotaService;
 
-        public QuotaMiddleware(RequestDelegate next, IConfiguration configuration, QuotaService quotaService)
+        public QuotaMiddleware(RequestDelegate next, IConfiguration configuration, IMemoryCache cache)
         {
             _next = next;
             _configuration = configuration;
-            _quotaService = quotaService;
+            _quotaService = new QuotaService(cache);
         }
 
         public async Task InvokeAsync(HttpContext context)
