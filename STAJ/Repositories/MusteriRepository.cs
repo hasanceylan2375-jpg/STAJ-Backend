@@ -5,6 +5,7 @@ namespace STAJ.Repositories
 {
     public class MusteriRepository : IMusteriRepository
     {
+        private const int MaxPageSize = 100;
         private readonly AppDbContext _context;
 
         public MusteriRepository(AppDbContext context)
@@ -66,15 +67,15 @@ namespace STAJ.Repositories
                 _ => sorgu.OrderBy(x => x.Id)
             };
 
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 5;
+            page = Math.Clamp(page, 1, int.MaxValue);
+            pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
             return sorgu.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         }
 
         public List<Musteri> CursorIleGetir(int? lastId = null, int pageSize = 5)
         {
-            if (pageSize < 1) pageSize = 5;
+            pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
             var sorgu = _context.Musteriler.OrderBy(x => x.Id).AsQueryable();
 
