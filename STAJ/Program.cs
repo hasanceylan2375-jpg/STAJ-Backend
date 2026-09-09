@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Threading.RateLimiting;
 using AutoMapper;
 using FluentValidation;
@@ -171,18 +172,24 @@ try
         };
     });
 
-    builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
-    {
-        options.InvalidModelStateResponseFactory = context =>
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
         {
-            var errors = context.ModelState
-                .Where(x => x.Value?.Errors.Count > 0)
-                .SelectMany(x => x.Value!.Errors)
-                .Select(x => string.IsNullOrWhiteSpace(x.ErrorMessage) ? "Geçersiz veri gönderildi." : x.ErrorMessage)
-                .ToList();
-            return new BadRequestObjectResult(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", errors));
-        };
-    });
+            options.JsonSerializerOptions.Encoder = JavaScriptEncoder.Default;
+            options.JsonSerializerOptions.MaxDepth = 32;
+        })
+        .ConfigureApiBehaviorOptions(options =>
+        {
+            options.InvalidModelStateResponseFactory = context =>
+            {
+                var errors = context.ModelState
+                    .Where(x => x.Value?.Errors.Count > 0)
+                    .SelectMany(x => x.Value!.Errors)
+                    .Select(x => string.IsNullOrWhiteSpace(x.ErrorMessage) ? "Geçersiz veri gönderildi." : x.ErrorMessage)
+                    .ToList();
+                return new BadRequestObjectResult(new DataResult<List<string>>(false, "Gönderilen bilgiler geçersiz.", errors));
+            };
+        });
 
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
@@ -235,6 +242,7 @@ try
 
     app.UseRequestLocalization(localizationOptions);
     app.UseMiddleware<SecurityHeadersMiddleware>();
+    app.UseMiddleware<InputSanitizationMiddleware>();
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseSerilogRequestLogging(options => options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms");
     app.UseMiddleware<ExceptionMiddleware>();
