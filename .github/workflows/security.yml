@@ -32,7 +32,7 @@ jobs:
           languages: csharp
 
       - name: Build
-        run: dotnet build STAJ/STAJ.csproj --configuration Release --no-restore
+        run: dotnet build STAJ/STAJ.csproj --configuration Release
 
       - name: Analyze
         uses: github/codeql-action/analyze@v3
