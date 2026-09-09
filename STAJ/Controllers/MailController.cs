@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using STAJ.Entities;
 using STAJ.Services;
@@ -6,6 +7,7 @@ namespace STAJ.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "AdminOnly")]
     public class MailController : ControllerBase
     {
         private readonly MailService _mailService;
