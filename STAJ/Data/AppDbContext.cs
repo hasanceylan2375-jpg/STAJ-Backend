@@ -16,10 +16,14 @@ namespace STAJ.Data
         public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<WorkflowRequest> WorkflowRequests { get; set; }
+        public DbSet<RagDocument> RagDocuments { get; set; }
+        public DbSet<RagChunk> RagChunks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.HasPostgresExtension("vector");
 
             modelBuilder.Entity<Musteri>().HasIndex(x => x.TcKimlikNo).IsUnique();
             modelBuilder.Entity<RefreshToken>().HasIndex(x => x.Token).IsUnique();
@@ -32,6 +36,26 @@ namespace STAJ.Data
                 .WithMany(x => x.RefreshTokens)
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RagDocument>()
+                .HasIndex(x => new { x.CompanyName, x.UploadedAtUtc });
+
+            modelBuilder.Entity<RagDocument>()
+                .HasMany(x => x.Chunks)
+                .WithOne(x => x.RagDocument)
+                .HasForeignKey(x => x.RagDocumentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RagChunk>()
+                .HasIndex(x => new { x.RagDocumentId, x.ChunkIndex })
+                .IsUnique();
+
+            modelBuilder.Entity<RagChunk>()
+                .HasIndex(x => x.Embedding)
+                .HasMethod("hnsw")
+                .HasOperators("vector_cosine_ops")
+                .HasStorageParameter("m", 16)
+                .HasStorageParameter("ef_construction", 64);
         }
     }
 }
