@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Pgvector;
+using Pgvector.EntityFrameworkCore;
 using STAJ.Data;
 using STAJ.Entities;
 
