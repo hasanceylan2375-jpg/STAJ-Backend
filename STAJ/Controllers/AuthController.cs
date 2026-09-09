@@ -13,6 +13,7 @@ namespace STAJ.Controllers
         public AuthController(AuthService authService) { _authService = authService; }
 
         [HttpPost("register")]
+        [EnableRateLimiting("auth")]
         public IActionResult Register([FromBody] RegisterRequest request)
         {
             var hata = _authService.KayitOl(request.KullaniciAdi, request.Sifre);
@@ -32,6 +33,7 @@ namespace STAJ.Controllers
         }
 
         [HttpPost("refresh")]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest request)
         {
             var result = await _authService.RefreshAsync(request.RefreshToken);
@@ -40,6 +42,7 @@ namespace STAJ.Controllers
         }
 
         [HttpPost("logout")]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Logout([FromBody] RefreshTokenRequest request)
         {
             var result = await _authService.LogoutAsync(request.RefreshToken);
