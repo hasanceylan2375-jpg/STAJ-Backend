@@ -10,8 +10,7 @@ namespace STAJ.Services
             [".jpg"] = "image/jpeg",
             [".jpeg"] = "image/jpeg",
             [".png"] = "image/png",
-            [".webp"] = "image/webp",
-            [".svg"] = "image/svg+xml"
+            [".webp"] = "image/webp"
         };
 
         private readonly Cloudinary _cloudinary;
@@ -25,20 +24,20 @@ namespace STAJ.Services
             var apiSecret = configuration["Cloudinary:ApiSecret"];
 
             if (string.IsNullOrWhiteSpace(cloudName) || string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(apiSecret))
-                throw new InvalidOperationException("Cloudinary ayarları eksik. CloudName, ApiKey ve ApiSecret tanımlanmalıdır.");
+                throw new InvalidOperationException("Cloudinary ayarları eksik.");
 
             _cloudinary = new Cloudinary(new Account(cloudName, apiKey, apiSecret));
         }
 
         public async Task<string> UploadAsync(IFormFile file, CancellationToken cancellationToken = default)
         {
-            Validate(file);
-            _logger.LogInformation("Cloudinary görsel yükleme başladı. Dosya: {FileName}, Boyut: {FileSize}, Tip: {ContentType}", file.FileName, file.Length, file.ContentType);
+            await ValidateAsync(file, cancellationToken);
+            _logger.LogInformation("Cloudinary görsel yükleme başladı. Boyut: {FileSize}, Tip: {ContentType}", file.Length, file.ContentType);
 
             await using var stream = file.OpenReadStream();
             var uploadParams = new ImageUploadParams
             {
-                File = new FileDescription(file.FileName, stream),
+                File = new FileDescription(Path.GetFileName(file.FileName), stream),
                 Folder = "staj-images",
                 PublicId = $"{Guid.NewGuid():N}",
                 Overwrite = false
@@ -48,18 +47,16 @@ namespace STAJ.Services
             if (result.Error is not null)
             {
                 _logger.LogError("Cloudinary görsel yükleme başarısız. {ErrorMessage}", result.Error.Message);
-                throw new InvalidOperationException($"Cloudinary görsel yükleme hatası: {result.Error.Message}");
+                throw new InvalidOperationException("Görsel depolama servisi şu anda kullanılamıyor.");
             }
 
             if (result.SecureUrl is null)
-                throw new InvalidOperationException("Cloudinary güvenli görsel URL'si döndürmedi.");
+                throw new InvalidOperationException("Görsel depolama servisi geçerli bir URL döndürmedi.");
 
-            var url = result.SecureUrl.AbsoluteUri;
-            _logger.LogInformation("Cloudinary görsel yükleme tamamlandı. URL: {Url}", url);
-            return url;
+            return result.SecureUrl.AbsoluteUri;
         }
 
-        private static void Validate(IFormFile file)
+        private static async Task ValidateAsync(IFormFile file, CancellationToken cancellationToken)
         {
             if (file is null || file.Length == 0)
                 throw new ArgumentException("Görsel dosyası boş olamaz.");
@@ -69,7 +66,24 @@ namespace STAJ.Services
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
             if (!AllowedTypes.TryGetValue(extension, out var expectedContentType)
                 || !string.Equals(file.ContentType, expectedContentType, StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("Sadece JPG, JPEG, PNG, WebP veya SVG görseller kabul edilir.");
+                throw new ArgumentException("Sadece JPG, JPEG, PNG veya WEBP görseller kabul edilir.");
+
+            await using var stream = file.OpenReadStream();
+            var header = new byte[12];
+            var read = await stream.ReadAsync(header.AsMemory(0, header.Length), cancellationToken);
+            if (!IsValidImageSignature(extension, header, read))
+                throw new ArgumentException("Dosya içeriği seçilen görsel türüyle eşleşmiyor.");
+        }
+
+        private static bool IsValidImageSignature(string extension, byte[] header, int length)
+        {
+            return extension switch
+            {
+                ".jpg" or ".jpeg" => length >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF,
+                ".png" => length >= 8 && header.AsSpan(0, 8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }),
+                ".webp" => length >= 12 && header.AsSpan(0, 4).SequenceEqual("RIFF"u8) && header.AsSpan(8, 4).SequenceEqual("WEBP"u8),
+                _ => false
+            };
         }
     }
 }
