@@ -11,16 +11,12 @@ namespace STAJ.Controllers
     public class MailController : ControllerBase
     {
         private readonly MailService _mailService;
-        private readonly CircuitBreakerService _circuitBreaker;
         private readonly IConfiguration _configuration;
+        private static readonly CircuitBreakerService CircuitBreaker = new();
 
-        public MailController(
-            MailService mailService,
-            CircuitBreakerService circuitBreaker,
-            IConfiguration configuration)
+        public MailController(MailService mailService, IConfiguration configuration)
         {
             _mailService = mailService;
-            _circuitBreaker = circuitBreaker;
             _configuration = configuration;
         }
 
@@ -34,7 +30,7 @@ namespace STAJ.Controllers
                 return BadRequest("Alıcı, konu ve mesaj alanları boş bırakılamaz.");
             }
 
-            if (_circuitBreaker.IsOpen)
+            if (CircuitBreaker.IsOpen)
                 return StatusCode(StatusCodes.Status503ServiceUnavailable, new { mesaj = "Mail servisi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin." });
 
             var failureThreshold = Math.Max(1, _configuration.GetValue<int>("Performance:CircuitBreakerFailureThreshold", 3));
@@ -43,12 +39,12 @@ namespace STAJ.Controllers
             try
             {
                 await _mailService.SendMailAsync(request.To, request.Subject, request.Body);
-                _circuitBreaker.RecordSuccess();
+                CircuitBreaker.RecordSuccess();
                 return Ok(new { mesaj = "Mail başarıyla gönderildi." });
             }
             catch
             {
-                _circuitBreaker.RecordFailure(failureThreshold, TimeSpan.FromSeconds(breakSeconds));
+                CircuitBreaker.RecordFailure(failureThreshold, TimeSpan.FromSeconds(breakSeconds));
                 return StatusCode(StatusCodes.Status503ServiceUnavailable, new { mesaj = "Mail servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin." });
             }
         }
