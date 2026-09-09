@@ -243,6 +243,7 @@ try
     app.UseRequestLocalization(localizationOptions);
     app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseMiddleware<InputSanitizationMiddleware>();
+    app.UseMiddleware<ResourceGovernorMiddleware>();
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseSerilogRequestLogging(options => options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms");
     app.UseMiddleware<ExceptionMiddleware>();
