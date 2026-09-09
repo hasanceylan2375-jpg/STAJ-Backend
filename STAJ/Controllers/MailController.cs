@@ -11,10 +11,17 @@ namespace STAJ.Controllers
     public class MailController : ControllerBase
     {
         private readonly MailService _mailService;
+        private readonly CircuitBreakerService _circuitBreaker;
+        private readonly IConfiguration _configuration;
 
-        public MailController(MailService mailService)
+        public MailController(
+            MailService mailService,
+            CircuitBreakerService circuitBreaker,
+            IConfiguration configuration)
         {
             _mailService = mailService;
+            _circuitBreaker = circuitBreaker;
+            _configuration = configuration;
         }
 
         [HttpPost("send")]
@@ -27,9 +34,23 @@ namespace STAJ.Controllers
                 return BadRequest("Alıcı, konu ve mesaj alanları boş bırakılamaz.");
             }
 
-            await _mailService.SendMailAsync(request.To, request.Subject, request.Body);
+            if (_circuitBreaker.IsOpen)
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new { mesaj = "Mail servisi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin." });
 
-            return Ok(new { mesaj = "Mail başarıyla gönderildi." });
+            var failureThreshold = Math.Max(1, _configuration.GetValue<int>("Performance:CircuitBreakerFailureThreshold", 3));
+            var breakSeconds = Math.Max(1, _configuration.GetValue<int>("Performance:CircuitBreakerBreakSeconds", 30));
+
+            try
+            {
+                await _mailService.SendMailAsync(request.To, request.Subject, request.Body);
+                _circuitBreaker.RecordSuccess();
+                return Ok(new { mesaj = "Mail başarıyla gönderildi." });
+            }
+            catch
+            {
+                _circuitBreaker.RecordFailure(failureThreshold, TimeSpan.FromSeconds(breakSeconds));
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new { mesaj = "Mail servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin." });
+            }
         }
     }
 }
