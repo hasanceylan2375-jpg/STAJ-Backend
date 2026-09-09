@@ -6,6 +6,7 @@ namespace STAJ.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "AdminOnly")]
     public class ImagesController : ControllerBase
     {
         private readonly CloudinaryImageService _imageService;
@@ -16,7 +17,6 @@ namespace STAJ.Controllers
         }
 
         [HttpPost("upload")]
-        [Authorize]
         [RequestSizeLimit(5 * 1024 * 1024)]
         public async Task<IActionResult> Upload(IFormFile file, CancellationToken cancellationToken)
         {
