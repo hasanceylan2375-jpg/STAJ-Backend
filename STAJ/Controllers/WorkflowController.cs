@@ -62,7 +62,7 @@ public class WorkflowController : ControllerBase
             .Where(x => x.RequestedBy == user)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
-        return Ok(items.Select(ToResponse));
+        return Ok(items.Select(x => ToResponse(x)));
     }
 
     [HttpGet("pending")]
@@ -73,7 +73,7 @@ public class WorkflowController : ControllerBase
             .Where(x => x.Type == CustomerCreate && x.Status == Pending)
             .OrderBy(x => x.CreatedAt)
             .ToListAsync();
-        return Ok(items.Select(ToResponse));
+        return Ok(items.Select(x => ToResponse(x)));
     }
 
     [HttpPost("{id:int}/approve")]
