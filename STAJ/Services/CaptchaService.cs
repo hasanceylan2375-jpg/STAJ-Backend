@@ -1,57 +1,43 @@
-using Microsoft.Extensions.Caching.Memory;
-using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace STAJ.Services;
 
 public class CaptchaService
 {
-    private readonly IMemoryCache _cache;
-    private const string CachePrefix = "captcha:";
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
 
-    public CaptchaService(IMemoryCache cache)
+    public CaptchaService(HttpClient httpClient, IConfiguration configuration)
     {
-        _cache = cache;
+        _httpClient = httpClient;
+        _configuration = configuration;
     }
 
-    public CaptchaChallenge Create()
+    public async Task<bool> VerifyAsync(string? token, string? remoteIp = null)
     {
-        var first = RandomNumberGenerator.GetInt32(1, 20);
-        var second = RandomNumberGenerator.GetInt32(1, 20);
-        var operation = RandomNumberGenerator.GetInt32(0, 3);
-        int answer;
-        string question;
+        if (string.IsNullOrWhiteSpace(token)) return false;
 
-        switch (operation)
+        var secret = _configuration["Recaptcha:SecretKey"];
+        if (string.IsNullOrWhiteSpace(secret)) return false;
+
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            case 0:
-                answer = first + second;
-                question = $"{first} + {second} = ?";
-                break;
-            case 1:
-                answer = first;
-                question = $"{first + second} - {second} = ?";
-                break;
-            default:
-                var firstFactor = RandomNumberGenerator.GetInt32(2, 10);
-                var secondFactor = RandomNumberGenerator.GetInt32(2, 10);
-                answer = firstFactor * secondFactor;
-                question = $"{firstFactor} × {secondFactor} = ?";
-                break;
-        }
+            ["secret"] = secret,
+            ["response"] = token,
+            ["remoteip"] = remoteIp ?? string.Empty
+        });
 
-        var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
-        _cache.Set(CachePrefix + id, answer, TimeSpan.FromMinutes(2));
-        return new CaptchaChallenge(id, question);
+        using var response = await _httpClient.PostAsync("https://www.google.com/recaptcha/api/siteverify", content);
+        if (!response.IsSuccessStatusCode) return false;
+
+        var result = await response.Content.ReadFromJsonAsync<RecaptchaVerifyResponse>();
+        return result?.Success == true;
     }
 
-    public bool Validate(string? id, string? answer)
+    private sealed class RecaptchaVerifyResponse
     {
-        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(answer)) return false;
-        if (!_cache.TryGetValue(CachePrefix + id, out int expected)) return false;
-
-        _cache.Remove(CachePrefix + id);
-        return int.TryParse(answer.Trim(), out var actual) && actual == expected;
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
     }
 }
-
-public record CaptchaChallenge(string Id, string Question);
