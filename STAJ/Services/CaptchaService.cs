@@ -18,20 +18,26 @@ public class CaptchaService
         var first = RandomNumberGenerator.GetInt32(1, 20);
         var second = RandomNumberGenerator.GetInt32(1, 20);
         var operation = RandomNumberGenerator.GetInt32(0, 3);
+        int answer;
+        string question;
 
-        var question = operation switch
+        switch (operation)
         {
-            0 => $"{first} + {second} = ?",
-            1 => $"{first + second} - {second} = ?",
-            _ => $"{RandomNumberGenerator.GetInt32(2, 10)} × {RandomNumberGenerator.GetInt32(2, 10)} = ?"
-        };
-
-        var answer = operation switch
-        {
-            0 => first + second,
-            1 => first,
-            _ => ExtractMultiplicationAnswer(question)
-        };
+            case 0:
+                answer = first + second;
+                question = $"{first} + {second} = ?";
+                break;
+            case 1:
+                answer = first;
+                question = $"{first + second} - {second} = ?";
+                break;
+            default:
+                var firstFactor = RandomNumberGenerator.GetInt32(2, 10);
+                var secondFactor = RandomNumberGenerator.GetInt32(2, 10);
+                answer = firstFactor * secondFactor;
+                question = $"{firstFactor} × {secondFactor} = ?";
+                break;
+        }
 
         var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
         _cache.Set(CachePrefix + id, answer, TimeSpan.FromMinutes(2));
@@ -45,12 +51,6 @@ public class CaptchaService
 
         _cache.Remove(CachePrefix + id);
         return int.TryParse(answer.Trim(), out var actual) && actual == expected;
-    }
-
-    private static int ExtractMultiplicationAnswer(string question)
-    {
-        var parts = question.Replace(" = ?", string.Empty).Split('×', StringSplitOptions.TrimEntries);
-        return int.Parse(parts[0]) * int.Parse(parts[1]);
     }
 }
 
