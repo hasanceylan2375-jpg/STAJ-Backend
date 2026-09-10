@@ -30,10 +30,11 @@ namespace STAJ.Controllers
         [EnableRateLimiting("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            var captchaId = Request.Headers["X-Captcha-Id"].FirstOrDefault();
-            var captchaAnswer = Request.Headers["X-Captcha-Answer"].FirstOrDefault();
-            if (!_captchaService.Validate(captchaId, captchaAnswer))
-                return BadRequest(new { mesaj = "CAPTCHA doğrulaması başarısız. Lütfen işlemi tekrar deneyin." });
+            var captchaToken = Request.Headers["X-Captcha-Token"].FirstOrDefault();
+            var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var captchaValid = await _captchaService.VerifyAsync(captchaToken, remoteIp);
+            if (!captchaValid)
+                return BadRequest(new { mesaj = "CAPTCHA doğrulaması başarısız. Lütfen tekrar deneyin." });
 
             var kullanici = _authService.Login(request.KullaniciAdi, request.Sifre);
             if (kullanici == null) return Unauthorized("Kullanıcı adı veya şifre hatalı.");
