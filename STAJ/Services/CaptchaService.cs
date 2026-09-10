@@ -1,16 +1,14 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace STAJ.Services;
 
 public class CaptchaService
 {
-    private readonly HttpClient _httpClient;
+    private static readonly HttpClient HttpClient = new();
     private readonly IConfiguration _configuration;
 
-    public CaptchaService(HttpClient httpClient, IConfiguration configuration)
+    public CaptchaService(IConfiguration configuration)
     {
-        _httpClient = httpClient;
         _configuration = configuration;
     }
 
@@ -28,7 +26,7 @@ public class CaptchaService
             ["remoteip"] = remoteIp ?? string.Empty
         });
 
-        using var response = await _httpClient.PostAsync("https://www.google.com/recaptcha/api/siteverify", content);
+        using var response = await HttpClient.PostAsync("https://www.google.com/recaptcha/api/siteverify", content);
         if (!response.IsSuccessStatusCode) return false;
 
         var result = await response.Content.ReadFromJsonAsync<RecaptchaVerifyResponse>();
