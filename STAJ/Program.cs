@@ -151,6 +151,7 @@ try
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
     builder.Services.AddScoped<IMusteriService, MusteriService>();
     builder.Services.AddScoped<AuthService>();
+    builder.Services.AddScoped<CaptchaService>();
     builder.Services.AddScoped<MailService>();
     builder.Services.AddScoped<CloudinaryImageService>();
     builder.Services.AddScoped<IDomainEventDispatcher, SignalRDomainEventDispatcher>();
