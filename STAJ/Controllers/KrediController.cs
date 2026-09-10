@@ -8,8 +8,6 @@ namespace STAJ.Controllers;
 [Authorize]
 public class KrediController : ControllerBase
 {
- private readonly KrediOdemePlanService _service;
- public KrediController(KrediOdemePlanService service)=>_service=service;
  [HttpPost("odeme-plani")]
- public ActionResult<KrediOdemePlanResponse> OdemePlani([FromBody]KrediOdemePlanRequest request){try{return Ok(_service.Hesapla(request));}catch(ArgumentException ex){return BadRequest(new{mesaj=ex.Message});}}
+ public ActionResult<KrediOdemePlanResponse> OdemePlani([FromBody]KrediOdemePlanRequest request){try{return Ok(new KrediOdemePlanService().Hesapla(request));}catch(ArgumentException ex){return BadRequest(new{mesaj=ex.Message});}}
 }
