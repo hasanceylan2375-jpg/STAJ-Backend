@@ -10,7 +10,12 @@ namespace STAJ.Controllers
     public class AuthController : ControllerBase
     {
         private readonly AuthService _authService;
-        public AuthController(AuthService authService) { _authService = authService; }
+        private readonly CaptchaService _captchaService;
+        public AuthController(AuthService authService, CaptchaService captchaService)
+        {
+            _authService = authService;
+            _captchaService = captchaService;
+        }
 
         [HttpPost("register")]
         [EnableRateLimiting("auth")]
@@ -25,6 +30,11 @@ namespace STAJ.Controllers
         [EnableRateLimiting("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
+            var captchaId = Request.Headers["X-Captcha-Id"].FirstOrDefault();
+            var captchaAnswer = Request.Headers["X-Captcha-Answer"].FirstOrDefault();
+            if (!_captchaService.Validate(captchaId, captchaAnswer))
+                return BadRequest(new { mesaj = "CAPTCHA doğrulaması başarısız. Lütfen işlemi tekrar deneyin." });
+
             var kullanici = _authService.Login(request.KullaniciAdi, request.Sifre);
             if (kullanici == null) return Unauthorized("Kullanıcı adı veya şifre hatalı.");
             var accessToken = _authService.TokenOlustur(kullanici);
